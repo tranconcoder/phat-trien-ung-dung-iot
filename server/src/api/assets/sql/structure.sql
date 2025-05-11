@@ -1,0 +1,61 @@
+DROP DATABASE IF EXISTS `app_db`;
+
+CREATE DATABASE IF NOT EXISTS `app_db`;
+
+USE `app_db`;
+
+CREATE TABLE IF NOT EXISTS `users` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `email` VARCHAR(255) NOT NULL UNIQUE,
+    `password` VARCHAR(255) NOT NULL,
+    `full_name` VARCHAR(255) NOT NULL,
+    `phone_number` VARCHAR(255) NOT NULL,
+    `address` VARCHAR(255) NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Stored in redis
+-- CREATE TABLE IF NOT EXISTS `key_tokens` (
+--     `id` INT AUTO_INCREMENT PRIMARY KEY,
+--     `user_id` INT NOT NULL,
+--     `token` VARCHAR(255) NOT NULL UNIQUE,
+--     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+-- );
+
+CREATE TABLE IF NOT EXISTS `car_model` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `car_name` VARCHAR(255) NOT NULL,
+    `car_weight` INT NOT NULL,
+    `car_price` DECIMAL(10, 2) NOT NULL,
+    `car_image` VARCHAR(255) NOT NULL,
+    `car_description` TEXT,
+    `car_created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `car_updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS `car_production` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `car_model_id` INT NOT NULL,
+    `car_production_year` INT NOT NULL,
+    `car_production_country` VARCHAR(255) NOT NULL,
+
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (`car_model_id`) REFERENCES `car_model`(`id`)
+);
+
+
+
+CREATE TABLE IF NOT EXISTS `user_car` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT NOT NULL,
+    `car_id` INT NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`),
+    FOREIGN KEY (`car_id`) REFERENCES `car_production`(`id`)
+);

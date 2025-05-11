@@ -1,0 +1,144 @@
+dependencies:
+  abobija/rc522:
+    component_hash: 45869b7a266329f19dbc84a878c97acdd20535ff7cdc4ed9c8cdbff7f8420d70
+    dependencies:
+    - name: idf
+      require: private
+      version: ^5.0
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.3.1
+  espressif/cmake_utilities:
+    component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.1'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 0.5.3
+  espressif/esp32-camera:
+    component_hash: c3eb05fbeeae884a23bed9b17d48d5f0da8872beadae0c0e747d2fbea6094f06
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 2.0.15
+  espressif/esp_modem:
+    component_hash: b541c3f5765d3ba062c0d004b9ca6da6d0af908293421c2dbe046c537fb2a011
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.1'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.4.0
+  espressif/esp_websocket_client:
+    component_hash: f77326f0e1c38da4e9c97e17c5d649b0dd13027f2645e720e48db269638fd622
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.4.0
+  espressif/iot_bridge:
+    component_hash: a2443074914abe08455474e63a4dbab298697625e00e6931a08b1ddaa57d1c23
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: espressif/esp_modem
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: target not in [esp32s2, esp32s3]
+      version: 1.*
+    - name: espressif/esp_modem_usb_dte
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: target in [esp32s2, esp32s3]
+      version: 1.*
+    - name: espressif/esp_tinyusb
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: target in [esp32s2, esp32s3]
+      - if: idf_version >=5.1.4
+      version: 1.*
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 0.11.9
+  espressif/mesh_lite:
+    component_hash: ea7689d4ca19e6193c53b2e36e3ee040c3083beb02d5ac37e7f3dc08700dfbcf
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: espressif/iot_bridge
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.11.9
+    - name: espressif/qrcode
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^0.1.0
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.1
+  espressif/qrcode:
+    component_hash: 3b493771bc5d6ad30cbf87c25bf784aada8a08c941504355b55d6b75518ed7bc
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 0.1.0~2
+  http_server:
+    dependencies: []
+    source:
+      path: C:\Users\tranv\Workspace\pt_iot\esp32cam_security_gate\main\components\http_server
+      type: local
+    version: '*'
+  idf:
+    source:
+      type: idf
+    version: 5.4.1
+  setup_esp32_cam:
+    dependencies: []
+    source:
+      path: C:\Users\tranv\Workspace\pt_iot\esp32cam_security_gate\main\components\setup_esp32_cam
+      type: local
+    version: '*'
+  setup_esp_websocket_client:
+    dependencies: []
+    source:
+      path: C:\Users\tranv\Workspace\pt_iot\esp32cam_security_gate\main\components\setup_esp_websocket_client
+      type: local
+    version: '*'
+direct_dependencies:
+- abobija/rc522
+- espressif/esp32-camera
+- espressif/esp_websocket_client
+- espressif/mesh_lite
+- http_server
+- idf
+- setup_esp32_cam
+- setup_esp_websocket_client
+manifest_hash: 8461ba0890411dcfabc3e0073805d4e4a71d45d4b048d224c963e365a5745ea0
+target: esp32
+version: 2.0.0

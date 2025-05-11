@@ -1,0 +1,26 @@
+dependencies:
+  espressif/cmake_utilities: 0.*
+  espressif/esp_modem:
+    rules:
+    - if: target not in [esp32s2, esp32s3]
+    version: 1.*
+  espressif/esp_modem_usb_dte:
+    rules:
+    - if: target in [esp32s2, esp32s3]
+    version: 1.*
+  espressif/esp_tinyusb:
+    rules:
+    - if: target in [esp32s2, esp32s3]
+    - if: idf_version >=5.1.4
+    version: 1.*
+  idf: '>=5.0'
+description: A smart bridge to make both ESP and the other MCU or smart device can
+  access the Internet
+documentation: https://github.com/espressif/esp-iot-bridge/blob/master/components/iot_bridge/User_Guide.md
+issues: https://github.com/espressif/esp-iot-bridge/issues
+repository: git://github.com/espressif/esp-iot-bridge.git
+repository_info:
+  commit_sha: 71e1238aceded61de90e5105899ec4d20bb7bcd8
+  path: components/iot_bridge
+url: https://github.com/espressif/esp-iot-bridge/tree/master/components/iot_bridge
+version: 0.11.9

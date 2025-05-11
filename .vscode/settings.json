@@ -1,0 +1,10 @@
+{
+  "cSpell.words": ["SOCKETIO"],
+  "files.associations": {
+    "*.dbclient-js": "javascript",
+    "esp32cam_security_gate.h": "c",
+    "setup_esp32_cam.h": "c",
+    "esp_camera.h": "c",
+    "http_server.h": "c"
+  }
+}

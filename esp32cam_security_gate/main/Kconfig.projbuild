@@ -1,0 +1,27 @@
+menu "Example Configuration"
+
+config ROUTER_SSID
+    string "Router SSID"
+        default "ROUTER_SSID"
+        help
+            Router SSID.
+
+config ROUTER_PASSWORD
+    string "Router password"
+        default "ROUTER_PASSWORD"
+        help
+            Router password.
+
+config WEBSOCKET_SERVER_IP
+    string "Server IP address"
+        default "192.168.1.3"
+        help
+            Server IP address.
+
+config WEBSOCKET_SERVER_PORT
+    int "Server port"
+        default "8887"
+        help
+            Server port.
+
+endmenu
