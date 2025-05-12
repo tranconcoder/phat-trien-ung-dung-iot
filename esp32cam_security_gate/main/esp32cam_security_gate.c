@@ -1,5 +1,4 @@
 #include "esp32cam_security_gate.h"
-#include "http_server.h"
 
 static int s_retry_num = 0;
 static const char *TAG = "main";
@@ -142,15 +141,6 @@ void app_main()
     s->set_hmirror(s, 1);
     s->set_vflip(s, 1);
     
-    // Start the HTTP configuration server
-    ESP_LOGI(TAG, "Starting HTTP configuration server");
-    esp_err_t http_server_result = start_config_http_server();
-    if (http_server_result != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start HTTP configuration server");
-    } else {
-        ESP_LOGI(TAG, "HTTP configuration server started successfully");
-    }
-
     // Start websocket client with the configured URI
     setup_esp_websocket_client_init();
 }

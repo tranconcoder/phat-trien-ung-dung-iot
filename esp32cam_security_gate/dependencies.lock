@@ -108,12 +108,6 @@ dependencies:
       registry_url: https://components.espressif.com
       type: service
     version: 0.1.0~2
-  http_server:
-    dependencies: []
-    source:
-      path: C:\Users\tranv\Workspace\pt_iot\esp32cam_security_gate\main\components\http_server
-      type: local
-    version: '*'
   idf:
     source:
       type: idf
@@ -135,10 +129,9 @@ direct_dependencies:
 - espressif/esp32-camera
 - espressif/esp_websocket_client
 - espressif/mesh_lite
-- http_server
 - idf
 - setup_esp32_cam
 - setup_esp_websocket_client
-manifest_hash: 8461ba0890411dcfabc3e0073805d4e4a71d45d4b048d224c963e365a5745ea0
+manifest_hash: 1e795f2dac56f0d9684d260b559bf779801e2d7c4126df37a36d8b49c761f994
 target: esp32
 version: 2.0.0

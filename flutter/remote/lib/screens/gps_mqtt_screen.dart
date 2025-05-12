@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert'; // Added for jsonDecode
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart'; // Added for Google Maps
 import '../services/gps_mqtt_service.dart';
 import '../services/mqtt_service.dart';
 import '../config/app_config.dart';
@@ -13,28 +15,38 @@ class GpsMqttScreen extends StatefulWidget {
 }
 
 class _GpsMqttScreenState extends State<GpsMqttScreen> {
-  final GpsMqttService _gpsMqttService =
-      GpsMqttService(clientId: 'flutter_gps_client');
-  final MqttService _mqttService = MqttService();
+  final GpsMqttService _gpsMqttService = GpsMqttService(
+      clientId: AppConfig.MQTT_CLIENT_ID_GPS); // Use ID from AppConfig
+  final MqttService _mapMqttService = MqttService(
+      id: 'flutter_map_client_${DateTime.now().millisecondsSinceEpoch}'); // Separate MQTT service for map
   bool _isInitialized = false;
   bool _isRunning = false;
-  bool _isMqttConnected = false;
-  Position? _lastPosition;
-  StreamSubscription? _mqttStatusSubscription;
+  bool _isGpsServiceMqttConnected = false;
+  bool _isMapMqttConnected = false;
+  // Position? _lastPosition; // Can be removed if not directly used for display elsewhere
+  StreamSubscription? _gpsServiceMqttStatusSubscription;
+  StreamSubscription? _mapMqttStatusSubscription;
+  StreamSubscription?
+      _gpsDataSubscription; // For listening to GPS data for the map
   int _messagesSent = 0;
   String _status = 'Chưa khởi tạo';
   Timer? _statusTimer;
 
+  // Google Map related state
+  GoogleMapController? _mapController;
+  LatLng _currentMapPosition =
+      const LatLng(10.260451, 105.9431572); // Default initial position
+  final Set<Marker> _markers = {};
+
   @override
   void initState() {
     super.initState();
-    _initializeService();
+    _initializeServices();
 
-    // Update UI status periodically
     _statusTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_isRunning && mounted) {
         setState(() {
-          _messagesSent++;
+          // _messagesSent++; // This will be incremented when a message is actually sent by GpsMqttService
         });
       }
     });
@@ -43,35 +55,87 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
   @override
   void dispose() {
     _gpsMqttService.dispose();
-    _mqttStatusSubscription?.cancel();
+    _mapMqttService.disconnect(); // Disconnect map MQTT service
+    _gpsServiceMqttStatusSubscription?.cancel();
+    _mapMqttStatusSubscription?.cancel();
+    _gpsDataSubscription?.cancel();
     _statusTimer?.cancel();
+    _mapController?.dispose();
     super.dispose();
   }
 
-  Future<void> _initializeService() async {
+  Future<void> _initializeServices() async {
     try {
-      bool initialized = await _gpsMqttService.initialize();
+      // Initialize GPS sending service
+      bool gpsServiceInitialized = await _gpsMqttService.initialize();
 
       if (mounted) {
         setState(() {
-          _isInitialized = initialized;
-          _isMqttConnected = _gpsMqttService.isMqttConnected;
-          _status = initialized
-              ? 'Đã khởi tạo. Sẵn sàng để gửi dữ liệu GPS.'
-              : 'Khởi tạo thất bại. Vui lòng kiểm tra quyền và kết nối.';
+          _isInitialized = gpsServiceInitialized;
+          _isGpsServiceMqttConnected = _gpsMqttService.isMqttConnected;
+          _status = gpsServiceInitialized
+              ? 'Dịch vụ GPS sẵn sàng. '
+              : 'Khởi tạo dịch vụ GPS thất bại. ';
         });
       }
 
-      // Listen to MQTT connection status changes
-      _mqttStatusSubscription =
+      _gpsServiceMqttStatusSubscription =
           _gpsMqttService.mqttConnectionStatusStream.listen((connected) {
         if (mounted) {
           setState(() {
-            _isMqttConnected = connected;
+            _isGpsServiceMqttConnected = connected;
+            if (!connected && _isInitialized) {
+              _status += 'MQTT gửi GPS bị mất kết nối. ';
+            } else if (connected && _isInitialized) {
+              _status = _status.replaceAll('MQTT gửi GPS bị mất kết nối. ', '');
+              _status += 'MQTT gửi GPS đã kết nối. ';
+            }
+          });
+        }
+      });
+
+      // Initialize and connect MQTT service for map display
+      await _initializeMapMqttService();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _status = 'Lỗi khởi tạo: $e';
+        });
+      }
+    }
+  }
+
+  Future<void> _initializeMapMqttService() async {
+    try {
+      bool mapMqttConnected = await _mapMqttService.connect();
+      if (mounted) {
+        setState(() {
+          _isMapMqttConnected = mapMqttConnected;
+          _status += mapMqttConnected
+              ? 'MQTT bản đồ đã kết nối.'
+              : 'MQTT bản đồ thất bại.';
+        });
+      }
+
+      if (mapMqttConnected) {
+        // MqttService now auto-subscribes to GPS_TOPIC on connection
+        _listenToGpsMessages();
+      }
+
+      _mapMqttStatusSubscription =
+          _mapMqttService.connectionStatusStream.listen((connected) {
+        if (mounted) {
+          setState(() {
+            _isMapMqttConnected = connected;
             if (!connected) {
-              _status = 'Mất kết nối MQTT. Đang thử kết nối lại...';
+              _status = _status.replaceAll('MQTT bản đồ đã kết nối.', '') +
+                  'MQTT bản đồ bị mất kết nối.';
+              // Attempt to reconnect map MQTT service
+              _mapMqttService.connect();
             } else {
-              _status = 'Đã kết nối MQTT.';
+              _status = _status.replaceAll('MQTT bản đồ bị mất kết nối.', '') +
+                  'MQTT bản đồ đã kết nối.';
+              _listenToGpsMessages(); // Re-listen if not already
             }
           });
         }
@@ -79,46 +143,94 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _status = 'Lỗi: $e';
+          _status += ' Lỗi MQTT bản đồ: $e';
         });
       }
     }
   }
 
-  Future<void> _reconnectMqtt() async {
-    try {
-      setState(() {
-        _status = 'Đang kết nối lại MQTT...';
-      });
+  void _listenToGpsMessages() {
+    _gpsDataSubscription?.cancel(); // Cancel previous subscription if any
+    _gpsDataSubscription = _mapMqttService.messageStream.listen((event) {
+      final topic = event['topic'];
+      final message = event['message'];
 
-      // Stop any existing service first
-      if (_isRunning) {
-        await _gpsMqttService.stop();
-        setState(() {
-          _isRunning = false;
-        });
+      if (topic == AppConfig.MQTT_GPS_TOPIC) {
+        try {
+          // Message is already decoded to Map<String, dynamic> by MqttService if it's JSON
+          final Map<String, dynamic> gpsData = message is Map<String, dynamic>
+              ? message
+              : jsonDecode(message.toString());
+
+          final double latitude = gpsData['latitude']?.toDouble();
+          final double longitude = gpsData['longitude']?.toDouble();
+          // final int timestamp = gpsData['timestamp']?.toInt();
+          // final double speed = gpsData['speed']?.toDouble();
+          // final double heading = gpsData['heading']?.toDouble();
+
+          if (mounted) {
+            setState(() {
+              _currentMapPosition = LatLng(latitude, longitude);
+              _markers.clear();
+              _markers.add(
+                Marker(
+                  markerId: const MarkerId('currentLocation'),
+                  position: _currentMapPosition,
+                  infoWindow: InfoWindow(
+                      title: 'Vị trí hiện tại',
+                      snippet: '$latitude, $longitude'),
+                ),
+              );
+            });
+            _mapController?.animateCamera(
+              CameraUpdate.newLatLng(_currentMapPosition),
+            );
+          }
+        } catch (e) {
+          debugPrint('Error processing GPS message: $e');
+          if (mounted) {
+            // Optionally update status
+            // _status = 'Lỗi xử lý dữ liệu GPS: $e';
+          }
+        }
       }
+    });
+  }
 
-      // Reinitialize
-      bool initialized = await _gpsMqttService.initialize();
+  Future<void> _reconnectMqtt() async {
+    setState(() {
+      _status = 'Đang kết nối lại MQTT...';
+    });
+    // Reconnect GPS sending service
+    if (_isInitialized) {
+      await _gpsMqttService.stop(); // Stop before re-initializing
+    }
+    bool gpsServiceReconnected = await _gpsMqttService.initialize();
 
+    // Reconnect Map MQTT service
+    await _mapMqttService.disconnect();
+    bool mapServiceReconnected = await _mapMqttService.connect();
+
+    if (mounted) {
       setState(() {
-        _isInitialized = initialized;
-        _isMqttConnected = _gpsMqttService.isMqttConnected;
-        _status = initialized
-            ? 'Đã kết nối lại MQTT thành công'
-            : 'Kết nối lại MQTT thất bại';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Lỗi khi kết nối lại: $e';
+        _isInitialized = gpsServiceReconnected;
+        _isGpsServiceMqttConnected = _gpsMqttService.isMqttConnected;
+        _isMapMqttConnected = mapServiceReconnected;
+        _status = (gpsServiceReconnected
+                ? 'Dịch vụ GPS đã kết nối lại. '
+                : 'Dịch vụ GPS kết nối lại thất bại. ') +
+            (mapServiceReconnected
+                ? 'MQTT bản đồ đã kết nối lại.'
+                : 'MQTT bản đồ kết nối lại thất bại.');
+        if (mapServiceReconnected) {
+          _listenToGpsMessages();
+        }
       });
     }
   }
 
   Future<void> _toggleService() async {
     if (_isRunning) {
-      // Stop service
       await _gpsMqttService.stop();
       if (mounted) {
         setState(() {
@@ -127,16 +239,40 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
         });
       }
     } else {
-      // Start service
+      if (!_isInitialized) {
+        await _initializeServices(); // Ensure services are initialized first
+        if (!_isInitialized) {
+          setState(() {
+            _status = 'Không thể khởi tạo dịch vụ. Vui lòng thử lại.';
+          });
+          return;
+        }
+      }
       try {
-        bool started = await _gpsMqttService.startSendingGpsData();
+        // Listen for actual sent messages to update the counter
+        // This requires GpsMqttService to expose a stream of sent messages or a callback
+        // For simplicity, we'll rely on the timer for now, or GpsMqttService can update a counter.
+        // Let's assume GpsMqttService handles its own message count if needed.
+        // For this screen, _messagesSent will just be an indicator of active sending time.
+
+        bool started =
+            await _gpsMqttService.startSendingGpsData(onMessageSent: () {
+          if (mounted) {
+            setState(() {
+              _messagesSent++;
+            });
+          }
+        });
         if (mounted) {
           setState(() {
             _isRunning = started;
-            _messagesSent = 0;
-            _status = started
-                ? 'Đang gửi dữ liệu GPS...'
-                : 'Không thể bắt đầu gửi dữ liệu GPS.';
+            if (started) {
+              _messagesSent = 0; // Reset counter on start
+              _status = 'Đang gửi dữ liệu GPS...';
+            } else {
+              _status =
+                  'Không thể bắt đầu gửi dữ liệu GPS. Kiểm tra kết nối MQTT của dịch vụ GPS.';
+            }
           });
         }
       } catch (e) {
@@ -153,7 +289,7 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gửi GPS qua MQTT'),
+        title: const Text('GPS qua MQTT & Bản đồ'), // Updated title
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -185,17 +321,25 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     StatusItem(
-                      title: 'Trạng thái khởi tạo:',
+                      title: 'Khởi tạo dịch vụ GPS:',
                       value: _isInitialized ? 'Đã khởi tạo' : 'Chưa khởi tạo',
                       isActive: _isInitialized,
                     ),
                     StatusItem(
-                      title: 'Kết nối MQTT:',
-                      value: _isMqttConnected ? 'Đã kết nối' : 'Chưa kết nối',
-                      isActive: _isMqttConnected,
+                      title: 'MQTT gửi GPS:',
+                      value: _isGpsServiceMqttConnected
+                          ? 'Đã kết nối'
+                          : 'Chưa kết nối',
+                      isActive: _isGpsServiceMqttConnected,
                     ),
                     StatusItem(
-                      title: 'Trạng thái dịch vụ:',
+                      title: 'MQTT bản đồ:',
+                      value:
+                          _isMapMqttConnected ? 'Đã kết nối' : 'Chưa kết nối',
+                      isActive: _isMapMqttConnected,
+                    ),
+                    StatusItem(
+                      title: 'Trạng thái gửi GPS:',
                       value: _isRunning ? 'Đang chạy' : 'Đã dừng',
                       isActive: _isRunning,
                     ),
@@ -216,7 +360,7 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
                     ),
                     StatusItem(
                       title: 'Số tin nhắn đã gửi:',
-                      value: _isRunning ? '$_messagesSent' : '0',
+                      value: _isRunning ? '$_messagesSent' : 'N/A', // Updated
                       isActive: _isRunning,
                     ),
                     const Divider(),
@@ -245,6 +389,31 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
               ),
             ),
 
+            const SizedBox(height: 20),
+
+            // Map View
+            Expanded(
+              child: Card(
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _currentMapPosition,
+                      zoom: 16.0,
+                    ),
+                    onMapCreated: (GoogleMapController controller) {
+                      _mapController = controller;
+                    },
+                    markers: _markers,
+                    myLocationEnabled:
+                        false, // Set to true if you want to show device's blue dot
+                    myLocationButtonEnabled: false,
+                    mapType: MapType.normal,
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 20),
 
             // Control buttons

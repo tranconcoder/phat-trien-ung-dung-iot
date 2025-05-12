@@ -8,7 +8,7 @@ import '../config/app_config.dart';
 
 class MqttService {
   MqttServerClient? _client;
-  final String clientId;
+  final String id;
   bool _connected = false;
 
   // Stream controllers to pass data around
@@ -22,7 +22,7 @@ class MqttService {
   Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
 
   MqttService({String? id})
-      : clientId = id ?? 'flutter_app_${DateTime.now().millisecondsSinceEpoch}';
+    : id = id ?? 'flutter_map_client_${DateTime.now().millisecondsSinceEpoch}';
 
   // Initialize and connect
   Future<bool> connect() async {
@@ -33,7 +33,7 @@ class MqttService {
 
     _client = MqttServerClient.withPort(
       AppConfig.MQTT_HOST,
-      clientId,
+      id,
       AppConfig.MQTT_PORT,
     );
 
@@ -58,54 +58,98 @@ class MqttService {
     // Setup connection message with authentication
     final connMessage = MqttConnectMessage()
         .withWillRetain()
-        .withClientIdentifier(clientId)
-        .withWillQos(MqttQos.atLeastOnce)
-        .authenticateAs(AppConfig.MQTT_USERNAME, AppConfig.MQTT_PASSWORD);
+        .withClientIdentifier(id)
+        .withWillQos(MqttQos.atLeastOnce);
+
+    // Add authentication if credentials are provided
+    if (AppConfig.MQTT_USERNAME.isNotEmpty &&
+        AppConfig.MQTT_PASSWORD.isNotEmpty) {
+      connMessage.authenticateAs(
+        AppConfig.MQTT_USERNAME,
+        AppConfig.MQTT_PASSWORD,
+      );
+    }
 
     _client!.connectionMessage = connMessage;
 
     // Connect to the broker
     try {
       await _client!.connect();
+      final MqttConnectionState connectionState =
+          _client!.connectionStatus!.state;
+      _connected = connectionState == MqttConnectionState.connected;
+
+      if (_connected) {
+        // Subscribe to the GPS topic by default
+        subscribe(AppConfig.MQTT_GPS_TOPIC);
+      } else {
+        // If not connected, try fallback options
+        await _tryFallbackConnection();
+      }
+
       return _connected;
     } catch (e) {
-      debugPrint('Exception: $e');
+      debugPrint('MQTT connection exception: $e');
       _client!.disconnect();
-      return false;
+      await _tryFallbackConnection();
+      return _connected;
     }
   }
 
-  // Publish message to a topic
-  void publishMessage(String topic, String message) {
-    if (_client != null &&
-        _client!.connectionStatus!.state == MqttConnectionState.connected) {
-      final builder = MqttClientPayloadBuilder();
-      builder.addString(message);
+  // Try fallback MQTT brokers if the primary one fails
+  Future<void> _tryFallbackConnection() async {
+    if (_connected) return;
 
-      _client!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
+    debugPrint('Trying fallback MQTT broker...');
+
+    // Disconnect from current client if any
+    _client?.disconnect();
+
+    // Try fallback broker
+    _client = MqttServerClient.withPort(
+      AppConfig.MQTT_FALLBACK_HOST,
+      id,
+      AppConfig.MQTT_FALLBACK_PORT,
+    );
+
+    _client!.secure = AppConfig.MQTT_FALLBACK_USE_TLS;
+    _client!.keepAlivePeriod = AppConfig.MQTT_KEEP_ALIVE;
+    _client!.onConnected = _onConnected;
+    _client!.onDisconnected = _onDisconnected;
+    _client!.onSubscribed = _onSubscribed;
+    _client!.onSubscribeFail = _onSubscribeFail;
+    _client!.pongCallback = _pong;
+    _client!.setProtocolV311();
+
+    final connMessage = MqttConnectMessage()
+        .withWillRetain()
+        .withClientIdentifier(id)
+        .withWillQos(MqttQos.atLeastOnce);
+
+    if (AppConfig.MQTT_USERNAME.isNotEmpty &&
+        AppConfig.MQTT_PASSWORD.isNotEmpty) {
+      connMessage.authenticateAs(
+        AppConfig.MQTT_USERNAME,
+        AppConfig.MQTT_PASSWORD,
+      );
     }
-  }
 
-  // Publish GPS location to the designated topic
-  void publishLocationData(
-    double latitude,
-    double longitude, {
-    double? speed,
-    double? heading,
-  }) {
-    final Map<String, dynamic> locationData = {
-      'latitude': latitude,
-      'longitude': longitude,
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-    };
+    _client!.connectionMessage = connMessage;
 
-    // Add optional data if available
-    if (speed != null) locationData['speed'] = speed;
-    if (heading != null) locationData['heading'] = heading;
+    try {
+      await _client!.connect();
+      _connected =
+          _client!.connectionStatus!.state == MqttConnectionState.connected;
 
-    // Convert to JSON string and publish
-    final String jsonData = jsonEncode(locationData);
-    publishMessage(AppConfig.MQTT_GPS_TOPIC, jsonData);
+      if (_connected) {
+        debugPrint('Connected to fallback MQTT broker');
+        subscribe(AppConfig.MQTT_GPS_TOPIC);
+      }
+    } catch (e) {
+      debugPrint('Fallback MQTT connection exception: $e');
+      _client!.disconnect();
+      _connected = false;
+    }
   }
 
   // Subscribe to a topic
@@ -130,8 +174,12 @@ class MqttService {
         _client!.connectionStatus!.state == MqttConnectionState.connected) {
       _client!.disconnect();
     }
+  }
 
-    // Close the stream controllers if they're not already closed
+  // Dispose resources
+  void dispose() {
+    disconnect();
+
     if (!_messageController.isClosed) {
       _messageController.close();
     }
@@ -144,16 +192,11 @@ class MqttService {
   // Callback handlers
   void _onConnected() {
     _connected = true;
+    debugPrint('Connected to MQTT broker');
 
-    // Check if the stream is still open before adding events
     if (!_connectionStatusController.isClosed) {
       _connectionStatusController.add(true);
     }
-
-    debugPrint('MQTT client connected');
-
-    // Subscribe to the GPS topic by default when connected
-    subscribe(AppConfig.MQTT_GPS_TOPIC);
 
     // Set up the message handler
     _client!.updates!.listen((List<MqttReceivedMessage<MqttMessage>> messages) {
@@ -166,9 +209,9 @@ class MqttService {
           recMess.payload.message,
         );
 
-        // Only process if message controller is still open
         if (!_messageController.isClosed) {
           try {
+            // Try to parse as JSON
             final Map<String, dynamic> data = {
               'topic': topic,
               'message': jsonDecode(messagePayload),
@@ -191,16 +234,14 @@ class MqttService {
 
   void _onDisconnected() {
     _connected = false;
+    debugPrint('Disconnected from MQTT broker');
 
-    // Check if the stream is still open before adding events
     if (!_connectionStatusController.isClosed) {
       _connectionStatusController.add(false);
     }
 
-    debugPrint('MQTT client disconnected');
-
     // Try to reconnect after a delay
-    Future.delayed(const Duration(seconds: AppConfig.MQTT_RECONNECT_DELAY), () {
+    Future.delayed(Duration(seconds: AppConfig.MQTT_RECONNECT_DELAY), () {
       if (!_connected) connect();
     });
   }

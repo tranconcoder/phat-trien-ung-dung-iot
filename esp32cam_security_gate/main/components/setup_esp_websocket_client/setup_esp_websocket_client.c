@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "esp_log.h"
-#include "http_server.h"
+#include "sdkconfig.h" // Add this to access Kconfig values
 
 #define STACK_SIZE 32 * 1024 // Increased from 4K to 8K
 
@@ -77,13 +77,9 @@ void task_send_image_to_websocket(void *ws_client)
 
 void setup_esp_websocket_client_init()
 {
-     // Get the websocket URI from NVS
+     // Get the websocket URI from NVS or Kconfig
      char uri[128];
-     esp_err_t err = get_websocket_uri(uri, sizeof(uri));
-     if (err != ESP_OK) {
-          ESP_LOGW(TAG, "Failed to get WebSocket URI from NVS, using default");
-     }
-     
+     sprintf(uri, "ws://%s:%d/frontcam", CONFIG_WEBSOCKET_SERVER_IP, CONFIG_WEBSOCKET_SERVER_PORT);
      ESP_LOGI(TAG, "Using WebSocket URI: %s", uri);
 
      esp_websocket_client_config_t ws_cfg = {

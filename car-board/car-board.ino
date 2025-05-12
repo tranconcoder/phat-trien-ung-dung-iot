@@ -16,6 +16,8 @@
 #define I2C_SCL_PIN 22
 #define DHT_PIN 35
 #define RELAY_PIN 14  // Pin connected to relay instead of direct LED
+#define LEFT_SIGNAL_PIN -1  // Default -1 means not configured
+#define RIGHT_SIGNAL_PIN -1 // Default -1 means not configured
 
 // Motor control pins (L298N)
 #define MOTOR_A_IN1 27 //banh truoc phai
@@ -50,6 +52,7 @@
  char* mqtt_password = "123";
  char* metrics_topic = "/metrics";
  char* commands_topic = "/commands";
+ char* turn_signals_topic = "/turn_signals"; // New topic for turn signals
  int mqtt_keep_alive = 30;
 bool mqtt_use_tls = true;
 
@@ -117,6 +120,10 @@ void handleRight();
 void handleStop();
 void handleRelayOn();
 void handleRelayOff();
+void handleLeftSignalOn();
+void handleLeftSignalOff();
+void handleRightSignalOn();
+void handleRightSignalOff();
 void setMotorDirection(MotorDirection direction);
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void reconnectMQTT();

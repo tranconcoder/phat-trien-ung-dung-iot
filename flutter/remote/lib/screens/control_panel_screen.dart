@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../config/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mqtt_client/mqtt_client.dart';
+import 'package:mqtt_client/mqtt_server_client.dart';
 
 class ControlPanelScreen extends StatefulWidget {
   const ControlPanelScreen({Key? key}) : super(key: key);
@@ -59,6 +61,14 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   bool _processingFrame = false; // To prevent overlapping frame captures
   int _frameCounter = 0; // Count frames for throttling
   int _frameThrottleRate = 1; // Send 1 out of every X frames
+
+  // MQTT client for turn signals
+  MqttServerClient? _mqttClient;
+  bool _isMqttConnected = false;
+
+  // Turn signal states
+  bool _isLeftSignalOn = false;
+  bool _isRightSignalOn = false;
 
   @override
   void initState() {
@@ -208,6 +218,9 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
 
     // Close camera WebSocket
     _closeCameraWebSocket();
+
+    // Disconnect MQTT client
+    _mqttClient?.disconnect();
 
     // Disconnect and dispose socket
     try {

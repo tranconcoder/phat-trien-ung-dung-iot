@@ -50,6 +50,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Debug mode
   bool _debugMode = false;
 
+  // Tab management
+  int _selectedIndex = 0;
+
+  // Google Maps controller
+  GoogleMapController? _mapController;
+  final Set<Marker> _markers = {};
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         setState(() {
           _metrics = metrics;
+          _updateMapMarker();
         });
       }
     });
@@ -422,12 +430,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       print('Subscribing to topic: ${AppConfig.MQTT_METRICS_TOPIC}');
       _client?.subscribe(AppConfig.MQTT_METRICS_TOPIC, MqttQos.atLeastOnce);
 
+      // Subscribe to GPS topic
+      print('Subscribing to GPS topic: ${AppConfig.MQTT_GPS_TOPIC}');
+      _client?.subscribe(AppConfig.MQTT_GPS_TOPIC, MqttQos.atLeastOnce);
+
       // Also subscribe to regular topic format without leading slash
       // as some brokers handle this differently
       if (AppConfig.MQTT_METRICS_TOPIC.startsWith('/')) {
         final String altTopic = AppConfig.MQTT_METRICS_TOPIC.substring(1);
         print('Also subscribing to alternative topic format: $altTopic');
         _client?.subscribe(altTopic, MqttQos.atLeastOnce);
+      }
+
+      if (AppConfig.MQTT_GPS_TOPIC.startsWith('/')) {
+        final String altGpsTopic = AppConfig.MQTT_GPS_TOPIC.substring(1);
+        print('Also subscribing to alternative GPS topic format: $altGpsTopic');
+        _client?.subscribe(altGpsTopic, MqttQos.atLeastOnce);
       }
 
       print('Successfully subscribed to topics');
@@ -649,6 +667,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
+    // Handle location data
+    LatLng? location;
+    if (data.containsKey('latitude') && data.containsKey('longitude')) {
+      double? lat, lng;
+
+      if (data['latitude'] is num) {
+        lat = (data['latitude'] as num).toDouble();
+      } else {
+        lat = double.tryParse(data['latitude'].toString());
+      }
+
+      if (data['longitude'] is num) {
+        lng = (data['longitude'] as num).toDouble();
+      } else {
+        lng = double.tryParse(data['longitude'].toString());
+      }
+
+      if (lat != null && lng != null) {
+        location = LatLng(lat, lng);
+        print('Updated location: $lat, $lng');
+
+        // Move map camera to new location if available
+        if (_mapController != null && _selectedIndex == 1) {
+          _mapController!.animateCamera(CameraUpdate.newLatLng(location));
+        }
+      }
+    }
+
     // Check for simulated flag
     final bool isSimulated = data['simulated'] == true;
     if (isSimulated) {
@@ -661,6 +707,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       energy: energy ?? _metrics.energy,
       temperature: temperature ?? _metrics.temperature,
       humidity: humidity ?? _metrics.humidity,
+      location: location ?? _metrics.location,
     );
 
     if (mounted && !_isDisposed) {
@@ -676,7 +723,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       print(
         'Metrics updated: speed=${_metrics.speed}, energy=${_metrics.energy}, '
-        'temp=${_metrics.temperature}, humidity=${_metrics.humidity}',
+        'temp=${_metrics.temperature}, humidity=${_metrics.humidity}, '
+        'location=${_metrics.location.latitude},${_metrics.location.longitude}',
       );
     }
   }
@@ -716,307 +764,377 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: Text(_selectedIndex == 0 ? 'Dashboard' : 'Vehicle Location'),
         actions: [_buildConnectionStatusIcon()],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Connection status indicator with extra info
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(vertical: 16),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: _getConnectionColor().withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: GestureDetector(
-                  onLongPress: () {
-                    setState(() {
-                      _debugMode = !_debugMode;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            _debugMode
-                                ? 'Debug mode enabled'
-                                : 'Debug mode disabled',
-                          ),
-                          duration: Duration(seconds: 1),
+      body: _buildBody(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
+        ],
+      ),
+    );
+  }
+
+  // Handle navigation item tap
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  // Build main body based on selected tab
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildDashboardTab();
+      case 1:
+        return _buildMapTab();
+      default:
+        return _buildDashboardTab();
+    }
+  }
+
+  // Build dashboard tab
+  Widget _buildDashboardTab() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Connection status indicator with extra info
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _getConnectionColor().withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: GestureDetector(
+                onLongPress: () {
+                  setState(() {
+                    _debugMode = !_debugMode;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          _debugMode
+                              ? 'Debug mode enabled'
+                              : 'Debug mode disabled',
                         ),
-                      );
-                    });
-                  },
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _getConnectionIcon(),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  });
+                },
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _getConnectionIcon(),
+                          color: _getConnectionColor(),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _getConnectionText(),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
                             color: _getConnectionColor(),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _getConnectionText(),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _getConnectionColor(),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_connectionState == MqttConnectionState.connected)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(
-                            'Broker: $_brokerAddress:$_port',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                            ),
+                        ),
+                      ],
+                    ),
+                    if (_connectionState == MqttConnectionState.connected)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          'Broker: $_brokerAddress:$_port',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
                           ),
                         ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Last message received indicator
-              _buildLastMessageIndicator(),
-
-              // Debug controls
-              if (_debugMode) _buildDebugControls(),
-
-              const SizedBox(height: 20),
-
-              // Speed display
-              Text(
-                'SPEED',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade600,
-                  letterSpacing: 2,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    _metrics.speed.toStringAsFixed(1),
-                    style: const TextStyle(
-                      fontSize: 80,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const Text(
-                    ' km/h',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ],
-              ),
-              // Speed progress bar
-              Container(
-                width: MediaQuery.of(context).size.width - 64, // Adjusted width
-                height: 8,
-                margin: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width:
-                          (MediaQuery.of(context).size.width - 64) *
-                          (_metrics.speed / AppConfig.PROGRESS_BAR_MAX_SPEED)
-                              .clamp(0.0, 1.0),
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        borderRadius: BorderRadius.circular(4),
                       ),
-                    ),
                   ],
                 ),
               ),
+            ),
 
-              const SizedBox(height: 20),
+            // Last message received indicator
+            _buildLastMessageIndicator(),
 
-              // Energy display
-              Text(
-                'ENERGY',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade600,
-                  letterSpacing: 2,
-                ),
+            // Debug controls
+            if (_debugMode) _buildDebugControls(),
+
+            const SizedBox(height: 20),
+
+            // Speed display
+            Text(
+              'SPEED',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                letterSpacing: 2,
               ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    _metrics.energy.toStringAsFixed(0),
-                    style: TextStyle(
-                      fontSize: 80,
-                      fontWeight: FontWeight.bold,
-                      color: _getEnergyColor(_metrics.energy),
-                    ),
-                  ),
-                  Text(
-                    ' %',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w500,
-                      color: _getEnergyColor(_metrics.energy),
-                    ),
-                  ),
-                ],
-              ),
-              // Energy progress bar
-              Container(
-                width: MediaQuery.of(context).size.width - 64, // Adjusted width
-                height: 8,
-                margin: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width:
-                          (MediaQuery.of(context).size.width - 64) *
-                          (_metrics.energy / 100).clamp(0.0, 1.0),
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _getEnergyColor(_metrics.energy),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Add temperature and humidity display
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Temperature card
-                  _buildEnvironmentCard(
-                    title: 'TEMPERATURE',
-                    value: _metrics.temperature.toStringAsFixed(1),
-                    unit: '°C',
-                    icon: Icons.thermostat,
-                    color: _getTemperatureColor(_metrics.temperature),
-                  ),
-
-                  // Humidity card
-                  _buildEnvironmentCard(
-                    title: 'HUMIDITY',
-                    value: _metrics.humidity.toStringAsFixed(0),
-                    unit: '%',
-                    icon: Icons.water_drop,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  _metrics.speed.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontSize: 80,
+                    fontWeight: FontWeight.bold,
                     color: Colors.blue,
                   ),
+                ),
+                const Text(
+                  ' km/h',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+            // Speed progress bar
+            Container(
+              width: MediaQuery.of(context).size.width - 64, // Adjusted width
+              height: 8,
+              margin: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width:
+                        (MediaQuery.of(context).size.width - 64) *
+                        (_metrics.speed / AppConfig.PROGRESS_BAR_MAX_SPEED)
+                            .clamp(0.0, 1.0),
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
                 ],
               ),
+            ),
 
-              // Add some bottom padding to avoid overflow
-              const SizedBox(height: 24),
-            ],
-          ),
+            const SizedBox(height: 20),
+
+            // Energy display
+            Text(
+              'ENERGY',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  _metrics.energy.toStringAsFixed(0),
+                  style: TextStyle(
+                    fontSize: 80,
+                    fontWeight: FontWeight.bold,
+                    color: _getEnergyColor(_metrics.energy),
+                  ),
+                ),
+                Text(
+                  ' %',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w500,
+                    color: _getEnergyColor(_metrics.energy),
+                  ),
+                ),
+              ],
+            ),
+            // Energy progress bar
+            Container(
+              width: MediaQuery.of(context).size.width - 64, // Adjusted width
+              height: 8,
+              margin: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width:
+                        (MediaQuery.of(context).size.width - 64) *
+                        (_metrics.energy / 100).clamp(0.0, 1.0),
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _getEnergyColor(_metrics.energy),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Add temperature and humidity display
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Temperature card
+                _buildEnvironmentCard(
+                  title: 'TEMPERATURE',
+                  value: _metrics.temperature.toStringAsFixed(1),
+                  unit: '°C',
+                  icon: Icons.thermostat,
+                  color: _getTemperatureColor(_metrics.temperature),
+                ),
+
+                // Humidity card
+                _buildEnvironmentCard(
+                  title: 'HUMIDITY',
+                  value: _metrics.humidity.toStringAsFixed(0),
+                  unit: '%',
+                  icon: Icons.water_drop,
+                  color: Colors.blue,
+                ),
+              ],
+            ),
+
+            // Add some bottom padding to avoid overflow
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );
   }
 
-  // Build environment metrics card
-  Widget _buildEnvironmentCard({
-    required String title,
-    required String value,
-    required String unit,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      width: (MediaQuery.of(context).size.width * 0.42).clamp(
-        100.0,
-        double.infinity,
-      ),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
+  // Build map tab
+  Widget _buildMapTab() {
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: _metrics.location,
+            zoom: AppConfig.DEFAULT_MAP_ZOOM,
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade600,
-              letterSpacing: 1,
+          markers: _markers,
+          mapType: MapType.normal,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: true,
+          zoomControlsEnabled: true,
+          onMapCreated: (GoogleMapController controller) {
+            _mapController = controller;
+            _updateMapMarker();
+          },
+        ),
+        // Speed and energy overlay
+        Positioned(
+          bottom: 16,
+          left: 16,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.speed, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_metrics.speed.toStringAsFixed(1)} km/h',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Last update: ${_lastMessageTime?.toLocal().toString().substring(11, 16) ?? "N/A"}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.battery_full,
+                          color: _getEnergyColor(_metrics.energy),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_metrics.energy.toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _getEnergyColor(_metrics.energy),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Coordinates: ${_metrics.location.latitude.toStringAsFixed(5)}, ${_metrics.location.longitude.toStringAsFixed(5)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
-          Icon(icon, size: 36, color: color),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              Text(
-                unit,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1171,5 +1289,95 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Implement manual message publishing logic here
     print('Manual message publishing requested');
     _publishTestMessage();
+  }
+
+  // Update map marker with current vehicle location
+  void _updateMapMarker() {
+    if (_mapController != null) {
+      setState(() {
+        _markers.clear();
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('vehicle'),
+            position: _metrics.location,
+            infoWindow: InfoWindow(
+              title: 'Vehicle',
+              snippet: 'Speed: ${_metrics.speed.toStringAsFixed(1)} km/h',
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueBlue,
+            ),
+          ),
+        );
+      });
+    }
+  }
+
+  // Build environment metrics card
+  Widget _buildEnvironmentCard({
+    required String title,
+    required String value,
+    required String unit,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      width: (MediaQuery.of(context).size.width * 0.42).clamp(
+        100.0,
+        double.infinity,
+      ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Icon(icon, size: 36, color: color),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              Text(
+                unit,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

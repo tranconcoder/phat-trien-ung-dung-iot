@@ -11,6 +11,7 @@ class GpsMqttService {
   StreamSubscription<Position>? _locationSubscription;
   Timer? _publishTimer;
   bool _isRunning = false;
+  VoidCallback? _onMessageSentCallback; // Added callback
 
   // Constructor
   GpsMqttService({String? clientId}) : _mqttService = MqttService(id: clientId);
@@ -40,8 +41,9 @@ class GpsMqttService {
   }
 
   // Start sending GPS data to MQTT broker
-  Future<bool> startSendingGpsData() async {
+  Future<bool> startSendingGpsData({VoidCallback? onMessageSent}) async { // Added onMessageSent parameter
     if (_isRunning) return true;
+    _onMessageSentCallback = onMessageSent; // Store the callback
 
     try {
       // Make sure services are initialized
@@ -92,6 +94,8 @@ class GpsMqttService {
       // Send GPS data to MQTT broker
       _mqttService.publishLocationData(position.latitude, position.longitude,
           speed: position.speed, heading: position.heading);
+      
+      _onMessageSentCallback?.call(); // Call the callback after publishing
 
       debugPrint(
           'Published GPS data: Lat: ${position.latitude}, Lng: ${position.longitude}');
@@ -103,6 +107,7 @@ class GpsMqttService {
   // Stop sending GPS data
   Future<void> stop() async {
     _isRunning = false;
+    _onMessageSentCallback = null; // Clear callback on stop
 
     // Cancel timer
     _publishTimer?.cancel();

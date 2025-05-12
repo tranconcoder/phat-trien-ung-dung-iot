@@ -7,11 +7,16 @@ class AppConfig {
 
   static const String MQTT_GPS_TOPIC = '/gps';
   static const String MQTT_METRICS_TOPIC = '/metrics';
+  static const String MQTT_TURN_SIGNALS_TOPIC = '/turn_signals';
 
   static const int MQTT_KEEP_ALIVE = 30;
   static const int MQTT_RECONNECT_DELAY = 5; // seconds
   static const String MQTT_USERNAME = 'trancon2';
   static const String MQTT_PASSWORD = '123';
+
+  // Client IDs
+  static const String MQTT_CLIENT_ID_REMOTE = 'flutter_remote_client'; // Added
+  static const String MQTT_CLIENT_ID_GPS = 'flutter_gps_client'; // Added
 
   // Location Service Configuration
   static const int LOCATION_UPDATE_INTERVAL = 1000; // milliseconds (1 second)
@@ -32,7 +37,8 @@ class AppConfig {
 
   // Socket.IO Configuration
   static const String SOCKETIO_URL = 'http://192.168.1.12:4001';
-  static const int SOCKETIO_CONNECT_TIMEOUT = 10000; // milliseconds
+  static const int SOCKETIO_CONNECT_TIMEOUT =
+      20000; // Increased from 10000 to 20000 milliseconds
   static const int SOCKETIO_RECONNECT_DELAY = 5000; // milliseconds
   static const String SOCKETIO_CAMERA_ROOM = 'drivercam';
 }

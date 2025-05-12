@@ -19,6 +19,7 @@ class AppConfig {
   static const String MQTT_METRICS_TOPIC = '/metrics';
   static const String MQTT_VEHICLE_TOPIC =
       '/metrics'; // Changed to match car-board
+  static const String MQTT_GPS_TOPIC = '/gps'; // GPS location updates topic
 
   static const int MQTT_KEEP_ALIVE = 30;
   static const int MQTT_RECONNECT_DELAY = 5; // seconds
@@ -29,6 +30,8 @@ class AppConfig {
   static const double DEFAULT_MAP_ZOOM = 15.0;
   static const double DEFAULT_LATITUDE = 10.823099; // Ho Chi Minh City
   static const double DEFAULT_LONGITUDE = 106.629662;
+  static const String GOOGLE_MAPS_API_KEY =
+      'YOUR_API_KEY'; // Add your Google Maps API key here
 
   // UI Configuration
   static const double PROGRESS_BAR_MAX_SPEED = 120.0; // km/h

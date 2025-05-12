@@ -5,6 +5,8 @@ import 'package:quan_ly_giao_thong/services/auth_service.dart';
 import 'package:quan_ly_giao_thong/screens/dashboard_screen.dart';
 import 'package:quan_ly_giao_thong/screens/login_screen.dart';
 import 'package:quan_ly_giao_thong/screens/profile_screen.dart';
+import 'package:quan_ly_giao_thong/config/app_config.dart';
+import 'package:quan_ly_giao_thong/screens/map_screen.dart';
 
 void main() {
   // Initialize the app without starting simulation
@@ -49,7 +51,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _screens = [
       const DashboardScreen(),
-      const CarsScreen(),
+      const MapScreen(),
       const SettingsScreen(),
       const ProfileScreen(),
     ];
@@ -76,32 +78,13 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.dashboard),
             label: 'Dashboard',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.directions_car),
-            label: 'Cars',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Settings',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
-      ),
-    );
-  }
-}
-
-class CarsScreen extends StatelessWidget {
-  const CarsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Cars')),
-      body: const Center(child: Text('Cars Content')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        child: const Icon(Icons.add),
       ),
     );
   }
