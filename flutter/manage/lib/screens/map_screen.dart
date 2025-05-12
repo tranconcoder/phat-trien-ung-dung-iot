@@ -24,6 +24,7 @@ class _MapScreenState extends State<MapScreen> {
   StreamSubscription? _mqttSubscription;
   bool _isConnected = false;
   DateTime? _lastUpdateTime;
+  bool _isFirstLocationUpdate = true;
 
   @override
   void initState() {
@@ -98,8 +99,18 @@ class _MapScreenState extends State<MapScreen> {
           ),
         );
 
-        // Move camera to the new position
-        _mapController?.animateCamera(CameraUpdate.newLatLng(position));
+        // Automatically focus on the car's location when it's first received or updated
+        if (_isFirstLocationUpdate) {
+          _mapController?.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(target: position, zoom: 16.0),
+            ),
+          );
+          _isFirstLocationUpdate = false;
+        } else {
+          // For subsequent updates, just pan to the new position
+          _mapController?.animateCamera(CameraUpdate.newLatLng(position));
+        }
       });
     }
   }
@@ -115,73 +126,24 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vehicle Location'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _reconnectMqtt,
-            tooltip: 'Reconnect MQTT',
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Status bar
-          Container(
-            color: _isConnected ? Colors.green.shade100 : Colors.red.shade100,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: Row(
-              children: [
-                Icon(
-                  _isConnected ? Icons.wifi : Icons.wifi_off,
-                  color: _isConnected ? Colors.green : Colors.red,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _isConnected
-                        ? 'Connected to MQTT server'
-                        : 'Disconnected from MQTT server',
-                    style: TextStyle(
-                      color:
-                          _isConnected
-                              ? Colors.green.shade800
-                              : Colors.red.shade800,
-                    ),
-                  ),
-                ),
-                if (_lastUpdateTime != null)
-                  Text(
-                    'Last update: ${_formatTime(_lastUpdateTime!)}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-              ],
-            ),
-          ),
-
-          // Map
-          Expanded(
-            child: GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: _defaultLocation,
-                zoom: AppConfig.DEFAULT_MAP_ZOOM,
-              ),
-              markers: _markers,
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
-              zoomControlsEnabled: true,
-              onMapCreated: (GoogleMapController controller) {
-                _mapController = controller;
-                _addDefaultMarker();
-              },
-            ),
-          ),
-        ],
+      appBar: AppBar(title: const Text('Vehicle Tracking')),
+      body: GoogleMap(
+        initialCameraPosition: CameraPosition(
+          target: _defaultLocation,
+          zoom: AppConfig.DEFAULT_MAP_ZOOM,
+        ),
+        markers: _markers,
+        myLocationEnabled: true,
+        myLocationButtonEnabled: true,
+        zoomControlsEnabled: true,
+        onMapCreated: (GoogleMapController controller) {
+          _mapController = controller;
+          _addDefaultMarker();
+        },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _centerMap,
-        child: const Icon(Icons.my_location),
+        onPressed: _centerOnVehicle,
+        child: const Icon(Icons.directions_car),
       ),
     );
   }
@@ -202,37 +164,15 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _centerMap() {
+  void _centerOnVehicle() {
     if (_markers.isNotEmpty) {
       _mapController?.animateCamera(
-        CameraUpdate.newLatLng(_markers.first.position),
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: _markers.first.position, zoom: 16.0),
+        ),
       );
     } else {
       _mapController?.animateCamera(CameraUpdate.newLatLng(_defaultLocation));
     }
-  }
-
-  Future<void> _reconnectMqtt() async {
-    // Disconnect first
-    _mqttSubscription?.cancel();
-    _mqttService.disconnect();
-
-    // Reinitialize
-    await _initMqttService();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isConnected
-              ? 'Successfully reconnected to MQTT'
-              : 'Failed to reconnect to MQTT',
-        ),
-        backgroundColor: _isConnected ? Colors.green : Colors.red,
-      ),
-    );
-  }
-
-  String _formatTime(DateTime dateTime) {
-    return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
   }
 }

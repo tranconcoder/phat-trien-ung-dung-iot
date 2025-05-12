@@ -30,8 +30,10 @@ class AppConfig {
   static const double DEFAULT_MAP_ZOOM = 15.0;
   static const double DEFAULT_LATITUDE = 10.823099; // Ho Chi Minh City
   static const double DEFAULT_LONGITUDE = 106.629662;
+
+  // NEW GOOGLE MAPS API KEY - Remember to enable billing and required APIs
   static const String GOOGLE_MAPS_API_KEY =
-      'YOUR_API_KEY'; // Add your Google Maps API key here
+      'AIzaSyAWGNCffIIVL15s2g8oZzIVAyCArBtiRDI';
 
   // UI Configuration
   static const double PROGRESS_BAR_MAX_SPEED = 120.0; // km/h

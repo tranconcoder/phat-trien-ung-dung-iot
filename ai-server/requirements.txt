@@ -1,4 +1,4 @@
 python-socketio==5.11.1
 eventlet==0.35.1
 opencv-python==4.8.1.78
-numpy==1.26.0 
+numpy==2.2.5

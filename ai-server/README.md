@@ -1,102 +1,89 @@
-# Socket.IO Image Streaming Server
+# AI Server with Drowsiness Detection
 
-This is a Python-based Socket.IO server that streams camera images to connected clients and receives control commands.
+This server processes driver camera images to detect drowsiness and sends the results via MQTT.
 
-## Features
+## Prerequisites
 
-- Streams real-time camera images to Flutter app
-- Handles vehicle control commands from the app
-- Provides test image generation when no camera is available
-- Supports room-based connection management
-- Displays received commands on test images
+- Python 3.8+ (Python 3.13 supported)
+- Required packages: `onnxruntime`, `numpy`, `Pillow`, `paho-mqtt`, `socketio`, `eventlet`, `matplotlib`
 
-## Setup
+## Getting Started
 
-### Prerequisites
-
-- Python 3.7 or higher
-- pip (Python package manager)
-- A webcam (optional - test images will be used if no camera is found)
-
-### Installation
-
-1. Clone this repository
-2. Install the required packages:
+### 1. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install onnxruntime Pillow numpy paho-mqtt python-socketio eventlet matplotlib
 ```
 
-### Running the Server
+### 2. Convert the Keras Model to ONNX (if needed)
 
-To start the server:
+If you already have a Keras model (`densenet201.keras`), you need to convert it to ONNX format:
 
 ```bash
-python server.py
+# Install TensorFlow and TF2ONNX in a Python environment that supports TensorFlow
+# (Note: Python 3.11 or earlier is recommended for TensorFlow)
+pip install tensorflow==2.12.0 tf2onnx
+
+# Run the conversion script
+python convert_model.py models/densenet201.keras models/densenet201.onnx
 ```
 
-To use test images instead of trying to access a camera:
+### 3. Test the Model
+
+You can test the drowsiness detection model on a single image:
 
 ```bash
-USE_TEST_IMAGE=true python server.py
+python test_drowsiness.py path/to/test/image.jpg
 ```
 
-By default, the server runs on port 5000. You can change this by setting the PORT environment variable:
+### 4. Run the Server
 
 ```bash
-PORT=8080 python server.py
+python main.py
 ```
 
-## Socket.IO Events
+This will start:
 
-### Server Events (that clients can listen to)
+- A Socket.IO server on port 4001
+- A WebSocket server on port 8887
 
-- `image`: Emits base64-encoded image data
-- `command_received`: Confirmation that a command was received
-- `message`: Server messages
+## How It Works
 
-### Client Events (that clients can emit)
+1. The server receives images from two sources:
 
-- `joinRoom`: Join a room (e.g., 'camera_feed')
-- `control`: Send a control command to the server
+   - ESP32 camera via WebSocket (`/frontcam`)
+   - Driver camera via WebSocket (`/drivercam`)
 
-## Integration with Flutter App
+2. When driver camera images are received, the server:
 
-1. Make sure your Flutter app has the Socket.IO client package installed
-2. Configure your app to connect to this server
-3. Join the 'camera_feed' room to receive images
-4. Send control commands as JSON with command and timestamp fields
+   - Processes the image using the drowsiness detection model
+   - Publishes the results to MQTT topic `/drowsy`
+   - Forwards the image to connected Socket.IO clients
 
-Example socket.io connection in Flutter:
+3. MQTT Messages Format:
+   ```json
+   {
+     "result": "Drowsy",
+     "class_index": 0,
+     "probability": 0.95,
+     "timestamp": 1623456789.123
+   }
+   ```
 
-```dart
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+## MQTT Configuration
 
-// Initialize Socket.IO
-socket = IO.io('http://your_server_ip:5000', <String, dynamic>{
-  'transports': ['websocket'],
-  'autoConnect': true,
-});
+The server attempts to connect to multiple MQTT brokers in this order:
 
-// Connect and handle events
-socket.onConnect((_) {
-  print('Connected to server');
-  socket.emit('joinRoom', 'camera_feed');
-});
+1. Primary: `fd66ecb3.ala.asia-southeast1.emqxsl.com:8883` (TLS)
+2. Fallback: `151.106.112.215:1883` (non-TLS)
+3. Public: `broker.emqx.io:1883` (non-TLS)
 
-socket.on('image', (data) {
-  // Handle image data (base64 string)
-  setState(() {
-    _mainImageBytes = base64Decode(data);
-  });
-});
+## Troubleshooting
 
-// Send control command
-void sendCommand(String direction) {
-  final payload = {
-    'command': direction,
-    'timestamp': DateTime.now().millisecondsSinceEpoch,
-  };
-  socket.emit('control', jsonEncode(payload));
-}
-```
+- If you encounter model loading errors, ensure your model is in ONNX format
+- For TLS connection issues, you may need to provide custom certificates
+- Monitor the log output for detailed error messages
+
+## License
+
+This project is licensed under the MIT License.

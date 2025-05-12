@@ -25,6 +25,7 @@ class MainApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomePage(),
+        '/map': (context) => const MapScreen(),
       },
       debugShowCheckedModeBanner: false,
     );
@@ -97,7 +98,18 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: const Center(child: Text('Settings Content')),
+      body: ListView(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.map),
+            title: const Text('Map View'),
+            subtitle: const Text('View vehicle locations on map'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () => Navigator.pushNamed(context, '/map'),
+          ),
+          // Other settings...
+        ],
+      ),
     );
   }
 }
