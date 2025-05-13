@@ -1,15 +1,29 @@
-<nav class="main-navbar">
-  <div class="container">
-    <div class="logo">
-      <a href="/">Quản lý giao thông</a>
-    </div>
-    <div class="nav-items">
-      <ul>
-        <li><a href="/" class="{{#if isHome}}active{{/if}}">Trang chủ</a></li>
-        <li><a href="/dashboard" class="{{#if isDashboard}}active{{/if}}">Bảng điều khiển</a></li>
-        <li><a href="/reports" class="{{#if isReports}}active{{/if}}">Báo cáo</a></li>
-        <li><a href="/settings" class="{{#if isSettings}}active{{/if}}">Cài đặt</a></li>
-      </ul>
-    </div>
+<nav>
+  <div class="container nav-container">
+    <a href="/" class="nav-brand">
+      <i class="fas fa-car"></i>
+      Quản lý xe
+    </a>
+
+    <ul class="nav-menu">
+      <li class="nav-item">
+        <a href="/" class="nav-link">
+          <i class="fas fa-home"></i>
+          Trang chủ
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="/dashboard" class="nav-link">
+          <i class="fas fa-tachometer-alt"></i>
+          Quản lý xe
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="/map" class="nav-link">
+          <i class="fas fa-map-marked-alt"></i>
+          Bản đồ
+        </a>
+      </li>
+    </ul>
   </div>
-</nav> 
+</nav>

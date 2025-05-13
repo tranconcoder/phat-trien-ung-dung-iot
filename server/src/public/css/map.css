@@ -1,0 +1,300 @@
+/* Map Container and Layout */
+.map-container {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "header header"
+    "sidebar map"
+    "status status";
+  height: calc(100vh - 60px);
+  width: 100%;
+  overflow: hidden;
+}
+
+.map-header {
+  grid-area: header;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #fff;
+  border-bottom: 1px solid #ddd;
+  z-index: 1000;
+}
+
+.map-sidebar {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f9fa;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+  height: 100%;
+}
+
+#map {
+  grid-area: map;
+  height: 100%;
+  z-index: 1;
+}
+
+.mqtt-status {
+  grid-area: status;
+  padding: 5px 10px;
+  background-color: #f8f9fa;
+  border-top: 1px solid #ddd;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+/* Map Controls */
+.map-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.map-controls .btn {
+  padding: 5px 10px;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s;
+}
+
+.map-controls .btn:hover {
+  background-color: #f1f1f1;
+}
+
+.map-controls .btn i {
+  font-size: 0.9rem;
+}
+
+/* Car List */
+.car-list {
+  padding: 15px;
+  flex: 1;
+}
+
+.car-list h3 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.car-item {
+  display: flex;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.car-item:hover {
+  background-color: #f1f1f1;
+  transform: translateY(-2px);
+}
+
+.car-item.active {
+  background-color: #e9f5ff;
+  border-left: 3px solid #0d6efd;
+}
+
+.car-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e9ecef;
+  margin-right: 10px;
+}
+
+.car-item-icon i {
+  font-size: 1.2rem;
+  color: #495057;
+}
+
+.car-item-info {
+  flex: 1;
+}
+
+.car-item-info h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.car-item-info p {
+  margin: 5px 0 0;
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.car-status {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-top: 5px;
+}
+
+.car-status.active {
+  background-color: #d1e7dd;
+  color: #0f5132;
+}
+
+.car-status.inactive {
+  background-color: #f8d7da;
+  color: #842029;
+}
+
+/* Car Details */
+.car-details {
+  padding: 15px;
+  background-color: #fff;
+  border-top: 1px solid #ddd;
+}
+
+.car-details h3 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.car-details-header {
+  margin-bottom: 15px;
+}
+
+.car-details-name {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.car-details-plate {
+  display: block;
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin-top: 5px;
+}
+
+.car-details-stats {
+  margin-bottom: 20px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.stat-label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.stat-value {
+  color: #212529;
+}
+
+.car-details-actions {
+  margin-top: 15px;
+}
+
+.car-details-actions .btn {
+  width: 100%;
+  padding: 8px 10px;
+  background-color: #0d6efd;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.2s;
+}
+
+.car-details-actions .btn:hover {
+  background-color: #0b5ed7;
+}
+
+/* Leaflet Map Customizations */
+.leaflet-popup-content {
+  min-width: 200px;
+}
+
+.car-popup {
+  text-align: center;
+}
+
+.car-popup-name {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-bottom: 5px;
+}
+
+.car-popup-data {
+  font-size: 0.9rem;
+  color: #495057;
+  margin-bottom: 10px;
+}
+
+.car-popup-link {
+  color: #0d6efd;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.car-popup-link:hover {
+  text-decoration: underline;
+}
+
+/* MQTT Connection Status */
+#mqtt-connection-status {
+  font-weight: 500;
+}
+
+#mqtt-connection-status.connected {
+  color: #198754;
+}
+
+#mqtt-connection-status.disconnected {
+  color: #dc3545;
+}
+
+#mqtt-connection-status.connecting {
+  color: #fd7e14;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .map-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-areas:
+      "header"
+      "sidebar"
+      "map"
+      "status";
+  }
+
+  .map-sidebar {
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+    max-height: 300px;
+  }
+}

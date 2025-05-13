@@ -1,27 +1,19 @@
 import { Router } from "express";
-import {
-  renderHomePage,
-  renderDashboardPage,
-  renderReportsPage,
-  renderSettingsPage,
-  renderNotFoundPage,
-} from "../controllers/page.controller";
+import { PageController } from "../controllers/page.controller";
 
 const router = Router();
+const pageController = new PageController();
 
 // Home page
-router.get("/", renderHomePage);
+router.get("/", pageController.getHomePage);
 
 // Dashboard page
-router.get("/dashboard", renderDashboardPage);
+router.get("/dashboard", pageController.getDashboardPage);
 
-// Reports page
-router.get("/reports", renderReportsPage);
+// Map page
+router.get("/map", pageController.getMapPage);
 
-// Settings page
-router.get("/settings", renderSettingsPage);
-
-// 404 page - Should be last
-router.use((req, res) => renderNotFoundPage(req, res));
+// 404 page - This should be at the end
+router.use(pageController.get404Page);
 
 export default router;

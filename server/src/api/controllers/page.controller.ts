@@ -1,50 +1,83 @@
 import type { Request, Response } from "express";
 
 /**
- * Render home page
+ * Controller for page routes
  */
-export const renderHomePage = (req: Request, res: Response) => {
-  res.render("index", {
-    title: "Hệ thống quản lý giao thông thông minh",
-    isHome: true,
-  });
-};
+export class PageController {
+  /**
+   * Render the home page
+   */
+  getHomePage(req: Request, res: Response): void {
+    res.render("index", {
+      title: "Trang chủ",
+      isHome: true,
+    });
+  }
 
-/**
- * Render dashboard page
- */
-export const renderDashboardPage = (req: Request, res: Response) => {
-  res.render("dashboard", {
-    title: "Bảng điều khiển - Hệ thống quản lý giao thông",
-    isDashboard: true,
-  });
-};
+  /**
+   * Render the dashboard page
+   */
+  getDashboardPage(req: Request, res: Response): void {
+    // Normally this would come from a database
+    const cars = [
+      {
+        id: 1,
+        name: "Toyota Camry",
+        licensePlate: "51F-123.45",
+        status: "Active",
+        lastMaintenance: "2023-05-15",
+        nextMaintenance: "2023-11-15",
+        location: "Quận 7, TP.HCM",
+      },
+      {
+        id: 2,
+        name: "Honda Civic",
+        licensePlate: "51G-678.90",
+        status: "Maintenance",
+        lastMaintenance: "2023-04-20",
+        nextMaintenance: "2023-10-20",
+        location: "Quận 2, TP.HCM",
+      },
+      {
+        id: 3,
+        name: "Ford Ranger",
+        licensePlate: "51H-246.80",
+        status: "Active",
+        lastMaintenance: "2023-06-10",
+        nextMaintenance: "2023-12-10",
+        location: "Quận 1, TP.HCM",
+      },
+    ];
 
-/**
- * Render reports page
- */
-export const renderReportsPage = (req: Request, res: Response) => {
-  res.render("reports", {
-    title: "Báo cáo - Hệ thống quản lý giao thông",
-    isReports: true,
-  });
-};
+    res.render("dashboard", {
+      title: "Quản lý xe",
+      cars,
+      isDashboard: true,
+      useDashboardCss: true,
+      useDashboardJs: true,
+    });
+  }
 
-/**
- * Render settings page
- */
-export const renderSettingsPage = (req: Request, res: Response) => {
-  res.render("settings", {
-    title: "Cài đặt - Hệ thống quản lý giao thông",
-    isSettings: true,
-  });
-};
+  /**
+   * Render the map page
+   */
+  getMapPage(req: Request, res: Response): void {
+    res.render("map", {
+      title: "Bản đồ xe",
+      useMapCss: true,
+      useMapJs: true,
+    });
+  }
 
-/**
- * Render 404 page
- */
-export const renderNotFoundPage = (req: Request, res: Response) => {
-  res.status(404).render("404", {
-    title: "Không tìm thấy trang - Hệ thống quản lý giao thông",
-  });
-};
+  /**
+   * Render the 404 page
+   */
+  get404Page(req: Request, res: Response): void {
+    res.status(404).render("error", {
+      title: "Page Not Found",
+      errorCode: 404,
+      errorMessage: "Trang bạn đang tìm kiếm không tồn tại.",
+      isError: true,
+    });
+  }
+}

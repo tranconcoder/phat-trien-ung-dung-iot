@@ -23,6 +23,7 @@ class _DriverCameraTabState extends State<DriverCameraTab>
   // WebSocket for sending camera frames
   WebSocketChannel? _webSocketChannel;
   bool _isConnected = false;
+  Timer? _heartbeatTimer; // Add heartbeat timer
 
   // Socket.IO for receiving drowsiness results
   late IO.Socket _socket;
@@ -65,6 +66,7 @@ class _DriverCameraTabState extends State<DriverCameraTab>
     _stopCapturing();
     _cameraController?.dispose();
     _webSocketChannel?.sink.close();
+    _heartbeatTimer?.cancel(); // Cancel heartbeat timer
     if (_isSocketConnected) {
       _socket.disconnect();
     }
@@ -120,6 +122,12 @@ class _DriverCameraTabState extends State<DriverCameraTab>
       _socket = IO.io(socketUrl, <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': true,
+        'reconnectionAttempts': 5, // Limit reconnection attempts
+        'reconnectionDelay': 2000, // Wait 2 seconds between attempts
+        'reconnectionDelayMax': 10000, // Max delay of 10 seconds
+        'timeout': 10000, // Connection timeout of 10 seconds
+        'pingTimeout': 5000, // Server must respond to pings within 5 seconds
+        'pingInterval': 3000, // Send ping every 3 seconds
       });
 
       _socket.onConnect((_) {
@@ -131,6 +139,21 @@ class _DriverCameraTabState extends State<DriverCameraTab>
 
       _socket.onDisconnect((_) {
         debugPrint('Socket.IO disconnected');
+        setState(() {
+          _isSocketConnected = false;
+        });
+      });
+
+      _socket.onConnectError((error) {
+        debugPrint('Socket.IO connect error: $error');
+        setState(() {
+          _isSocketConnected = false;
+        });
+      });
+
+      // Use onError instead of onConnectTimeout which isn't available
+      _socket.onError((error) {
+        debugPrint('Socket.IO error: $error');
         setState(() {
           _isSocketConnected = false;
         });
@@ -235,13 +258,51 @@ class _DriverCameraTabState extends State<DriverCameraTab>
   // Connect to WebSocket for sending camera frames
   void _connectWebSocket() {
     try {
+      // Cancel any existing heartbeat timer
+      _heartbeatTimer?.cancel();
+
       final wsUrl = 'ws://$_serverIp:8887/drivercam';
       debugPrint('Connecting to WebSocket: $wsUrl');
 
       _webSocketChannel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
+      // Listen for connection closed events
+      _webSocketChannel!.stream.listen(
+        (dynamic message) {
+          // Handle incoming messages (if any)
+        },
+        onError: (error) {
+          debugPrint('WebSocket error: $error');
+          setState(() {
+            _isConnected = false;
+          });
+          _heartbeatTimer?.cancel();
+        },
+        onDone: () {
+          debugPrint('WebSocket connection closed');
+          setState(() {
+            _isConnected = false;
+          });
+          _heartbeatTimer?.cancel();
+
+          // Try to reconnect if we're still capturing
+          if (mounted && _isCapturing) {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted && _isCapturing) {
+                _connectWebSocket();
+              }
+            });
+          }
+        },
+      );
+
       setState(() {
         _isConnected = true;
+      });
+
+      // Start heartbeat timer to detect server disconnection
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+        _checkConnection();
       });
     } catch (e) {
       debugPrint('Error connecting to WebSocket: $e');
@@ -255,6 +316,26 @@ class _DriverCameraTabState extends State<DriverCameraTab>
           _connectWebSocket();
         }
       });
+    }
+  }
+
+  // Check if connection is still active
+  void _checkConnection() {
+    if (_webSocketChannel == null || !_isConnected) return;
+
+    try {
+      // Try to send a ping message to check connection
+      _webSocketChannel!.sink.add(Uint8List(0)); // Empty ping message
+    } catch (e) {
+      debugPrint('Connection check failed: $e');
+      setState(() {
+        _isConnected = false;
+      });
+
+      // Reconnect if needed
+      if (mounted && _isCapturing) {
+        _connectWebSocket();
+      }
     }
   }
 
@@ -344,8 +425,11 @@ class _DriverCameraTabState extends State<DriverCameraTab>
           debugPrint('Sent frame: ${imageBytes.length} bytes');
         } catch (e) {
           debugPrint('Error sending frame: $e');
+          // Mark as disconnected
+          setState(() {
+            _isConnected = false;
+          });
           // Reconnect on error
-          _isConnected = false;
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted && _isCapturing) {
               _connectWebSocket();

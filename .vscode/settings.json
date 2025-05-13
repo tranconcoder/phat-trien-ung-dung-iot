@@ -7,5 +7,6 @@
     "esp_camera.h": "c",
     "http_server.h": "c",
     "sdkconfig.h": "c"
-  }
+  },
+  "cmake.sourceDirectory": "C:/Users/tranv/Workspace/pt_iot/car-board"
 }

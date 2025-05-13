@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'gps_mqtt_screen.dart';
-import 'settings_screen.dart';
-import 'control_panel_screen.dart';
-import 'vehicle_metrics_screen.dart';
+import 'package:flutter/services.dart';
 import 'driver_camera_tab.dart';
+import 'gps_mqtt_screen.dart';
+// import 'settings_screen.dart'; // Removed
+import 'control_panel_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -16,13 +16,18 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 1; // Default to the control panel screen
 
   // List of screens/pages we can navigate to
-  final List<Widget> _screens = const [
-    GpsMqttScreen(),
-    ControlPanelScreen(),
-    DriverCameraTab(),
-    VehicleMetricsScreen(),
-    SettingsScreen(),
-  ];
+  late List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _screens = [
+      GpsMqttScreen(),
+      ControlPanelScreen(),
+      DriverCameraTab(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,14 +54,10 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.face),
             label: 'Driver Cam',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.speed),
-            label: 'Thông số',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Cài đặt',
-          ),
+          // BottomNavigationBarItem( // Removed
+          //   icon: Icon(Icons.settings),
+          //   label: 'Cài đặt',
+          // ),
         ],
       ),
     );

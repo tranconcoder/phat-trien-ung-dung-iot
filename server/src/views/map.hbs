@@ -1,0 +1,81 @@
+<div class="map-container">
+  <div class="map-header">
+    <h1>Vị trí xe</h1>
+    <div class="map-controls">
+      <button id="center-map" class="btn"><i class="fas fa-crosshairs"></i>
+        Trung tâm</button>
+      <button id="refresh-data" class="btn"><i class="fas fa-sync-alt"></i>
+        Làm mới</button>
+    </div>
+  </div>
+
+  <div class="map-sidebar">
+    <div class="car-list">
+      <h3>Danh sách xe</h3>
+      <div id="car-list-container">
+        <!-- Car items will be added dynamically -->
+      </div>
+    </div>
+
+    <div class="car-details" id="car-details">
+      <h3>Thông tin chi tiết</h3>
+      <div class="car-details-content">
+        <p>Chọn một xe để xem thông tin chi tiết</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="mqtt-status">
+    <span id="mqtt-connection-status">Đang kết nối MQTT...</span>
+  </div>
+</div>
+
+<!-- Hidden car template for JavaScript to clone -->
+<template id="car-item-template">
+  <div class="car-item" data-id="">
+    <div class="car-item-icon">
+      <i class="fas fa-car"></i>
+    </div>
+    <div class="car-item-info">
+      <h4 class="car-name"></h4>
+      <p class="car-plate"></p>
+      <span class="car-status"></span>
+    </div>
+  </div>
+</template>
+
+<!-- Hidden car details template -->
+<template id="car-details-template">
+  <div class="car-details-header">
+    <h3 class="car-details-name"></h3>
+    <span class="car-details-plate"></span>
+  </div>
+  <div class="car-details-stats">
+    <div class="stat-row">
+      <span class="stat-label">Nhiệt độ:</span>
+      <span class="stat-value temperature"></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Độ ẩm:</span>
+      <span class="stat-value humidity"></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Pin:</span>
+      <span class="stat-value battery"></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Tốc độ:</span>
+      <span class="stat-value speed"></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Cập nhật:</span>
+      <span class="stat-value last-update"></span>
+    </div>
+  </div>
+  <div class="car-details-actions">
+    <button class="btn center-on-car"><i class="fas fa-search-location"></i>
+      Xem trên bản đồ</button>
+  </div>
+</template>

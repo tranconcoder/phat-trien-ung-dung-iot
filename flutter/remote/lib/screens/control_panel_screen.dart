@@ -500,7 +500,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
         title: Row(
           children: [
             const Text(
-              'Điều Khiển Xe',
+              'Điều KHiển Xe',
               style: TextStyle(
                 fontSize: 16, // Smaller font to prevent overflow
               ),
@@ -536,106 +536,111 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   Widget _buildControlPanel() {
     return Stack(
       children: [
-        // Main layout
-        Column(
-          children: [
-            // Main camera - full width 16:9
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: _mainImageError
-                  ? _buildImageErrorPlaceholder()
-                  : _buildMainImageView(),
-            ),
-
-            // Car IP display
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Car IP
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.car_crash, size: 10, color: Colors.blue),
-                      const SizedBox(width: 2),
-                      Text(
-                        'Xe: $_carIpAddress',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                  // WebSocket IP
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.wifi, size: 10, color: Colors.green),
-                      const SizedBox(width: 2),
-                      Text(
-                        'WS: $_websocketIpAddress',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      GestureDetector(
-                        onTap: _showCarIpDialog,
-                        child: const Icon(
-                          Icons.edit,
-                          size: 10,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+        // Main layout - Wrap the Column with SingleChildScrollView
+        SingleChildScrollView(
+          physics:
+              const BouncingScrollPhysics(), // Optional: Nice scroll physics
+          child: Column(
+            children: [
+              // Main camera - full width 16:9
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: _mainImageError
+                    ? _buildImageErrorPlaceholder()
+                    : _buildMainImageView(),
               ),
-            ),
 
-            // Add a thin divider
-            Divider(
-              color: Colors.grey.withOpacity(0.3),
-              thickness: 1,
-              height: 8,
-            ),
-
-            // Control container with fixed height to prevent overflow
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final availableHeight = MediaQuery.of(context).size.height;
-                final appBarHeight = AppBar().preferredSize.height;
-                final statusBarHeight = MediaQuery.of(context).padding.top;
-                final ipDisplayHeight =
-                    40.0; // Approximate height of IP display
-
-                // Calculate max safe height for controls
-                final safeHeight = availableHeight -
-                    appBarHeight -
-                    statusBarHeight -
-                    ipDisplayHeight -
-                    15.0;
-
-                return Container(
-                  constraints: BoxConstraints(
-                    maxHeight: safeHeight,
-                  ),
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 60),
-                      child: _buildDirectionalControls(),
+              // Car IP display
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Car IP
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.car_crash,
+                            size: 10, color: Colors.blue),
+                        const SizedBox(width: 2),
+                        Text(
+                          'Xe: $_carIpAddress',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                );
-              },
-            ),
-          ],
+                    // WebSocket IP
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.wifi, size: 10, color: Colors.green),
+                        const SizedBox(width: 2),
+                        Text(
+                          'WS: $_websocketIpAddress',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        GestureDetector(
+                          onTap: _showCarIpDialog,
+                          child: const Icon(
+                            Icons.edit,
+                            size: 10,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Add a thin divider
+              Divider(
+                color: Colors.grey.withOpacity(0.3),
+                thickness: 1,
+                height: 8,
+              ),
+
+              // Control container with fixed height to prevent overflow
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableHeight = MediaQuery.of(context).size.height;
+                  final appBarHeight = AppBar().preferredSize.height;
+                  final statusBarHeight = MediaQuery.of(context).padding.top;
+                  final ipDisplayHeight =
+                      40.0; // Approximate height of IP display
+
+                  // Calculate max safe height for controls
+                  final safeHeight = availableHeight -
+                      appBarHeight -
+                      statusBarHeight -
+                      ipDisplayHeight -
+                      15.0;
+
+                  return Container(
+                    constraints: BoxConstraints(
+                      maxHeight: safeHeight,
+                    ),
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 60),
+                        child: _buildDirectionalControls(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -782,14 +787,20 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   Widget _buildDirectionalControls() {
     // Use MediaQuery to make the control size responsive to screen size
     final screenSize = MediaQuery.of(context).size;
-    final buttonBaseSize = screenSize.width < 360 ? 42.0 : 48.0;
+    // Calculate a base size that scales with screen width (within reasonable limits)
+    final double baseSize = (screenSize.width * 0.15).clamp(40.0, 60.0);
+    // Calculate spacing based on screen width
+    final double horizontalSpacing = (screenSize.width * 0.02).clamp(5.0, 15.0);
+    // Calculate vertical spacing based on screen width or a fraction of base size
+    final double verticalSpacing = baseSize * 0.1;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0),
+      // Reduced horizontal padding to give controls more space
+      padding: const EdgeInsets.symmetric(horizontal: 5.0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Last command indicator
+          // Last command indicator (keep existing style)
           if (_lastCommand.isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -816,7 +827,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
               ),
             ),
 
-          const SizedBox(height: 2),
+          SizedBox(height: verticalSpacing), // Dynamic vertical spacing
 
           // Forward button
           Row(
@@ -826,10 +837,11 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                 icon: Icons.arrow_upward,
                 onPressed: () => _sendControlCommand('forward'),
                 color: Colors.green,
-                size: buttonBaseSize,
+                size: baseSize, // Use scaled base size
               ),
             ],
           ),
+          SizedBox(height: verticalSpacing), // Dynamic vertical spacing
 
           // Left, Stop, Right buttons
           Row(
@@ -839,24 +851,25 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                 icon: Icons.arrow_back,
                 onPressed: () => _sendControlCommand('left'),
                 color: Colors.orange,
-                size: buttonBaseSize,
+                size: baseSize, // Use scaled base size
               ),
-              SizedBox(width: screenSize.width < 360 ? 6 : 8),
+              SizedBox(width: horizontalSpacing), // Dynamic horizontal spacing
               _buildControlButton(
                 icon: Icons.stop_circle_outlined,
                 onPressed: () => _sendControlCommand('stop'),
                 color: Colors.red,
-                size: buttonBaseSize * 1.2,
+                size: baseSize * 1.2, // Stop button slightly larger
               ),
-              SizedBox(width: screenSize.width < 360 ? 6 : 8),
+              SizedBox(width: horizontalSpacing), // Dynamic horizontal spacing
               _buildControlButton(
                 icon: Icons.arrow_forward,
                 onPressed: () => _sendControlCommand('right'),
                 color: Colors.orange,
-                size: buttonBaseSize,
+                size: baseSize, // Use scaled base size
               ),
             ],
           ),
+          SizedBox(height: verticalSpacing), // Dynamic vertical spacing
 
           // Backward button
           Row(
@@ -866,13 +879,13 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                 icon: Icons.arrow_downward,
                 onPressed: () => _sendControlCommand('backward'),
                 color: Colors.blue,
-                size: buttonBaseSize,
+                size: baseSize, // Use scaled base size
               ),
             ],
           ),
 
           // LED/Relay control
-          const SizedBox(height: 6),
+          SizedBox(height: verticalSpacing * 2), // More space before LED
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -880,14 +893,14 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                 icon: Icons.lightbulb,
                 onPressed: () => _sendControlCommand('led/on'),
                 color: Colors.amber,
-                size: buttonBaseSize * 0.8,
+                size: baseSize * 0.8, // LED buttons smaller
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: horizontalSpacing * 1.5), // More space for LED
               _buildControlButton(
                 icon: Icons.lightbulb_outline,
                 onPressed: () => _sendControlCommand('led/off'),
                 color: Colors.grey,
-                size: buttonBaseSize * 0.8,
+                size: baseSize * 0.8, // LED buttons smaller
               ),
             ],
           ),
@@ -902,6 +915,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
               ),
             ),
           ),
+          SizedBox(height: verticalSpacing), // Bottom padding
         ],
       ),
     );
