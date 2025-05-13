@@ -436,7 +436,8 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
                         _isInitialized
                             ? (_isRunning ? 'Dừng gửi GPS' : 'Bắt đầu gửi GPS')
                             : 'Khởi tạo dịch vụ',
-                        style: const TextStyle(fontSize: 16, color: Colors.white),
+                        style:
+                            const TextStyle(fontSize: 16, color: Colors.white),
                       ),
                     ),
                     const SizedBox(height: 16),

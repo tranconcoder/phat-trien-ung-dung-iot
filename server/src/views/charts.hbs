@@ -1,0 +1,64 @@
+<div class="charts-container">
+  <div class="charts-header">
+    <h1>Car Metrics Dashboard</h1>
+    <div class="car-selector">
+      <label for="car-select">Select Car:</label>
+      <select id="car-select">
+        <option value="">Loading cars...</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="chart-controls">
+    <div class="metric-buttons">
+      <button
+        class="btn metric-btn active"
+        data-type="temperature"
+      >Temperature</button>
+      <button class="btn metric-btn" data-type="humidity">Humidity</button>
+      <button class="btn metric-btn" data-type="speed">Speed</button>
+      <button class="btn metric-btn" data-type="battery">Battery</button>
+    </div>
+    <div class="time-range">
+      <button class="btn time-btn" data-period="1h">1 hour</button>
+      <button class="btn time-btn" data-period="6h">6 hours</button>
+      <button class="btn time-btn active" data-period="24h">24 hours</button>
+      <button class="btn time-btn" data-period="7d">7 days</button>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="metrics-chart"></canvas>
+  </div>
+
+  <div class="current-values">
+    <div class="value-card temperature">
+      <h3>Temperature</h3>
+      <p class="value" id="temp-value">--</p>
+      <p class="unit">°C</p>
+    </div>
+    <div class="value-card humidity">
+      <h3>Humidity</h3>
+      <p class="value" id="humidity-value">--</p>
+      <p class="unit">%</p>
+    </div>
+    <div class="value-card speed">
+      <h3>Speed</h3>
+      <p class="value" id="speed-value">--</p>
+      <p class="unit">km/h</p>
+    </div>
+    <div class="value-card battery">
+      <h3>Battery</h3>
+      <p class="value" id="battery-value">--</p>
+      <p class="unit">%</p>
+    </div>
+  </div>
+
+  <div class="last-update">
+    <p>Last update: <span id="last-update-time">--</span></p>
+    <button id="refresh-btn" class="btn">
+      <i class="fas fa-sync-alt"></i>
+      Refresh
+    </button>
+  </div>
+</div>

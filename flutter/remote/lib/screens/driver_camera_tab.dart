@@ -6,6 +6,8 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../config/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
 
 class DriverCameraTab extends StatefulWidget {
   const DriverCameraTab({Key? key}) : super(key: key);
@@ -35,6 +37,12 @@ class _DriverCameraTabState extends State<DriverCameraTab>
   bool _isDrowsy = false;
   DateTime _lastUpdate = DateTime.now();
 
+  // Alert sound player
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isAlertPlaying = false;
+  bool _alertEnabled = true;
+  Timer? _alertCooldownTimer;
+
   // Frame capture settings
   Timer? _captureTimer;
   bool _isCapturing = false;
@@ -58,6 +66,77 @@ class _DriverCameraTabState extends State<DriverCameraTab>
       _initializeCamera();
       _initializeSocketIO();
     });
+    _initializeAudioPlayer();
+  }
+
+  // Initialize audio player and prepare alert sound
+  Future<void> _initializeAudioPlayer() async {
+    try {
+      // Set audio session configuration for alerts
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      debugPrint('Audio player initialized');
+    } catch (e) {
+      debugPrint('Error initializing audio player: $e');
+    }
+  }
+
+  // Play alert sound when drowsy
+  Future<void> _playAlertSound() async {
+    if (!_alertEnabled || _isAlertPlaying) return;
+
+    try {
+      setState(() {
+        _isAlertPlaying = true;
+      });
+
+      // Vibrate the phone
+      HapticFeedback.heavyImpact();
+
+      // Play alert sound using the correct method
+      await _audioPlayer.play(AssetSource('sounds/wake_up_alert.mp3'));
+
+      // Cancel any existing cooldown timer
+      _alertCooldownTimer?.cancel();
+
+      // Set a timer to stop the alert after 5 seconds
+      _alertCooldownTimer = Timer(const Duration(seconds: 5), () {
+        _stopAlertSound();
+
+        // Set a cooldown period before allowing alerts again
+        Future.delayed(const Duration(seconds: 10), () {
+          if (mounted) {
+            setState(() {
+              _alertEnabled = true;
+            });
+          }
+        });
+      });
+
+      debugPrint('Started playing alert sound');
+    } catch (e) {
+      debugPrint('Error playing alert sound: $e');
+      setState(() {
+        _isAlertPlaying = false;
+      });
+    }
+  }
+
+  // Stop alert sound
+  Future<void> _stopAlertSound() async {
+    if (!_isAlertPlaying) return;
+
+    try {
+      await _audioPlayer.stop();
+      if (mounted) {
+        setState(() {
+          _isAlertPlaying = false;
+          _alertEnabled = false; // Prevent immediate re-triggering
+        });
+      }
+      debugPrint('Stopped playing alert sound');
+    } catch (e) {
+      debugPrint('Error stopping alert sound: $e');
+    }
   }
 
   @override
@@ -67,6 +146,8 @@ class _DriverCameraTabState extends State<DriverCameraTab>
     _cameraController?.dispose();
     _webSocketChannel?.sink.close();
     _heartbeatTimer?.cancel(); // Cancel heartbeat timer
+    _alertCooldownTimer?.cancel();
+    _audioPlayer.dispose();
     if (_isSocketConnected) {
       _socket.disconnect();
     }
@@ -79,6 +160,7 @@ class _DriverCameraTabState extends State<DriverCameraTab>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
       _stopCapturing();
+      _stopAlertSound();
     } else if (state == AppLifecycleState.resumed) {
       if (_isCapturing) {
         _startCapturing();
@@ -168,6 +250,15 @@ class _DriverCameraTabState extends State<DriverCameraTab>
             _drowsinessProbability = data['probability'] ?? 0.0;
             _isDrowsy = _drowsinessResult == 'Drowsy';
             _lastUpdate = DateTime.now();
+
+            // Check if drowsiness probability is above threshold (95%)
+            if (_isDrowsy && _drowsinessProbability > 0.95) {
+              _playAlertSound();
+            } else if (_isAlertPlaying &&
+                (!_isDrowsy || _drowsinessProbability <= 0.90)) {
+              // Stop alert if no longer drowsy or probability drops below 90%
+              _stopAlertSound();
+            }
           });
         }
       });
@@ -369,6 +460,9 @@ class _DriverCameraTabState extends State<DriverCameraTab>
       _isCapturing = false;
     });
 
+    // Stop alert sound when stopping capture
+    _stopAlertSound();
+
     debugPrint('Stopped camera capture');
   }
 
@@ -527,6 +621,30 @@ class _DriverCameraTabState extends State<DriverCameraTab>
       appBar: AppBar(
         title: const Text('Driver Drowsiness Detection'),
         actions: [
+          // Alert toggle button
+          IconButton(
+            icon: Icon(
+              _alertEnabled
+                  ? Icons.notifications_active
+                  : Icons.notifications_off,
+              color: _alertEnabled ? Colors.amber : Colors.grey,
+            ),
+            tooltip: _alertEnabled ? 'Disable Alerts' : 'Enable Alerts',
+            onPressed: () {
+              setState(() {
+                _alertEnabled = !_alertEnabled;
+                if (!_alertEnabled && _isAlertPlaying) {
+                  _stopAlertSound();
+                }
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content: Text(_alertEnabled
+                        ? 'Drowsiness alerts enabled'
+                        : 'Drowsiness alerts disabled')),
+              );
+            },
+          ),
           // Server settings button
           IconButton(
             icon: const Icon(Icons.settings),
@@ -600,7 +718,16 @@ class _DriverCameraTabState extends State<DriverCameraTab>
               child: _isCameraInitialized
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: CameraPreview(_cameraController!),
+                      child: Transform.scale(
+                        scale: 1.0,
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio:
+                                1 / _cameraController!.value.aspectRatio,
+                            child: CameraPreview(_cameraController!),
+                          ),
+                        ),
+                      ),
                     )
                   : Center(
                       child: _hasCameraError
@@ -650,17 +777,33 @@ class _DriverCameraTabState extends State<DriverCameraTab>
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            color: _isDrowsy ? Colors.red.shade800 : Colors.green.shade800,
+            color: _isDrowsy
+                ? (_drowsinessProbability > 0.95
+                    ? Colors.red.shade900
+                    : Colors.red.shade800)
+                : Colors.green.shade800,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  _drowsinessResult,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _drowsinessResult,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (_isAlertPlaying) const SizedBox(width: 12),
+                    if (_isAlertPlaying)
+                      const Icon(
+                        Icons.notifications_active,
+                        color: Colors.amber,
+                        size: 24,
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -675,7 +818,11 @@ class _DriverCameraTabState extends State<DriverCameraTab>
                   value: _drowsinessProbability,
                   backgroundColor: Colors.white.withOpacity(0.3),
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    _isDrowsy ? Colors.red.shade300 : Colors.green.shade300,
+                    _isDrowsy
+                        ? (_drowsinessProbability > 0.95
+                            ? Colors.red.shade100
+                            : Colors.red.shade300)
+                        : Colors.green.shade300,
                   ),
                 ),
                 const SizedBox(height: 8),

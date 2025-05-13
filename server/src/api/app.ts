@@ -10,6 +10,8 @@ import authRouter from "./routes/auth.route";
 import rootRouter from "./routes/index.route";
 import pageRouter from "./routes/page.route";
 import handleError from "./middlewares/error.middleware";
+import mqttService from "./services/mqtt.service";
+
 const app = express();
 
 // Body parser
@@ -60,6 +62,28 @@ app.use("/", pageRouter);
 // Error handler
 app.use(handleError);
 
-await connect();
+// Connect to databases and services
+const initServices = async () => {
+  try {
+    // Connect to MySQL
+    await connect();
+    console.log("MySQL connected successfully");
+
+    // Initialize MQTT service
+    // The connection is handled in the service constructor
+    console.log("MQTT service initialized");
+
+    // Handle process termination
+    process.on("SIGINT", async () => {
+      console.log("Closing connections...");
+      await mqttService.disconnect();
+      process.exit(0);
+    });
+  } catch (error) {
+    console.error("Service initialization error:", error);
+  }
+};
+
+initServices();
 
 export default app;

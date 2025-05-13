@@ -70,6 +70,17 @@ export class PageController {
   }
 
   /**
+   * Render the charts page
+   */
+  getChartsPage(req: Request, res: Response): void {
+    res.render("charts", {
+      title: "Biểu đồ dữ liệu",
+      useChartsCss: true,
+      useChartsJs: true,
+    });
+  }
+
+  /**
    * Render the 404 page
    */
   get404Page(req: Request, res: Response): void {

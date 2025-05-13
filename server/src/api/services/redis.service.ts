@@ -8,7 +8,7 @@ import {
 import { KEY_TOKEN_EXPIRATION } from "../../configs/jwt.config";
 
 class RedisService {
-  private client;
+  public client;
 
   constructor() {
     this.client = createClient({
@@ -66,6 +66,54 @@ class RedisService {
     } catch (error) {
       console.error("Error removing token from Redis:", error);
       throw error;
+    }
+  }
+
+  // Car data methods
+
+  async getCarLatestData(carId: string) {
+    try {
+      const key = `car:${carId}:latest`;
+      const data = await this.client.get(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error(`Error retrieving latest data for car ${carId}:`, error);
+      throw error;
+    }
+  }
+
+  async getAllCarIds() {
+    try {
+      return await this.client.sMembers("cars");
+    } catch (error) {
+      console.error("Error retrieving all car IDs:", error);
+      return [];
+    }
+  }
+
+  async getCarMetricsInRange(
+    carId: string,
+    startTime: number,
+    endTime: number
+  ) {
+    try {
+      const key = `car:${carId}:metrics`;
+      const data = await this.client.zRangeByScore(key, startTime, endTime);
+      return data.map((item) => JSON.parse(item));
+    } catch (error) {
+      console.error(`Error retrieving metrics for car ${carId}:`, error);
+      return [];
+    }
+  }
+
+  async getCarMetricsLatest(carId: string, count: number) {
+    try {
+      const key = `car:${carId}:metrics`;
+      const data = await this.client.zRange(key, -count, -1);
+      return data.map((item) => JSON.parse(item));
+    } catch (error) {
+      console.error(`Error retrieving latest metrics for car ${carId}:`, error);
+      return [];
     }
   }
 

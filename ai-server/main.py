@@ -13,6 +13,7 @@ import sys
 import subprocess
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import cv2
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -23,8 +24,21 @@ try:
     import tensorflow as tf
     from tensorflow.keras.models import load_model
     logger.info("TensorFlow imported successfully")
+    have_tensorflow = True
 except ImportError:
     logger.error("TensorFlow import failed - please install tensorflow")
+    print("WARNING: TensorFlow import failed - drowsiness detection will be disabled")
+    have_tensorflow = False
+
+# Import ultralytics YOLOv8
+try:
+    from ultralytics import YOLO
+    logger.info("YOLOv8 imported successfully")
+    have_yolo = True
+except ImportError:
+    logger.error("YOLOv8 import failed - please install ultralytics")
+    print("WARNING: YOLOv8 import failed - traffic sign detection will be disabled")
+    have_yolo = False
 
 # Socket.IO setup
 sio = socketio.Server(cors_allowed_origins='*', binary=True)
@@ -46,6 +60,129 @@ MQTT_TOPIC_DROWSY = "/drowsy"
 # Model path - using only Keras
 KERAS_MODEL_PATH = 'models/densenet201.keras'
 FULL_MODEL_PATH = os.path.join('C:', os.sep, 'Users', 'tranv', 'Workspace', 'pt_iot', 'ai-server', 'models', 'densenet201.keras')
+
+# YOLOv8 model path
+YOLO_MODEL_PATH = 'models/best.pt'
+FULL_YOLO_MODEL_PATH = os.path.join('C:', os.sep, 'Users', 'tranv', 'Workspace', 'pt_iot', 'ai-server', 'models', 'best.pt')
+
+# Class names for YOLOv8 model
+YOLO_CLASS_NAMES = ['Speed Limit -10-','Speed Limit -100-','Speed Limit -110-','Speed Limit -120-','Speed Limit -20-','Speed Limit -30-','Speed Limit -40-','Speed Limit -50-','Speed Limit -60-','Speed Limit -70-','Speed Limit -80-','Speed Limit -90-', 'Traffic Green', 'Traffic Red', 'Traffic Yellow']
+
+class TrafficDetector:
+    def __init__(self):
+        self.model = None
+        self.load_model()
+    
+    def load_model(self):
+        """Load YOLOv8 model"""
+        # Debug information
+        print(f"Current working directory: {os.getcwd()}")
+        absolute_path = os.path.abspath(FULL_YOLO_MODEL_PATH)
+        print(f"Absolute model path: {absolute_path}")
+        
+        # Just check if the model file exists before trying to import ultralytics
+        file_exists = os.path.exists(FULL_YOLO_MODEL_PATH) or os.path.exists(YOLO_MODEL_PATH)
+        if not file_exists:
+            print("ERROR: YOLOv8 model file not found!")
+            logger.error("YOLOv8 model file not found!")
+            return False
+            
+        print(f"Model file found with size: {os.path.getsize(FULL_YOLO_MODEL_PATH if os.path.exists(FULL_YOLO_MODEL_PATH) else YOLO_MODEL_PATH)} bytes")
+        
+        # Try to import ultralytics - if it fails, just log the error
+        try:
+            from ultralytics import YOLO
+            have_ultralytics = True
+        except ImportError as ie:
+            print(f"WARNING: ultralytics module not available: {ie}")
+            logger.warning(f"ultralytics module not available: {ie}")
+            print("Traffic sign detection is disabled, but server will continue running")
+            logger.warning("Traffic sign detection is disabled, but server will continue running")
+            have_ultralytics = False
+            return False
+            
+        # If ultralytics is available, try to load the model
+        if have_ultralytics:
+            model_paths_to_try = [
+                FULL_YOLO_MODEL_PATH,  # Try the absolute path first
+                YOLO_MODEL_PATH,       # Then try the relative path
+                os.path.join(os.getcwd(), YOLO_MODEL_PATH)  # Try from current working directory
+            ]
+            
+            for model_path in model_paths_to_try:
+                if os.path.exists(model_path):
+                    try:
+                        print(f"Attempting to load model from: {model_path}")
+                        self.model = YOLO(model_path)
+                        print(f"SUCCESS: YOLOv8 model loaded from {model_path}")
+                        logger.info(f"YOLOv8 model loaded successfully from {model_path}")
+                        return True
+                    except Exception as e:
+                        full_error = str(e)
+                        print(f"ERROR loading model: {full_error}")
+                        logger.error(f"Error loading YOLOv8 model from {model_path}: {full_error}")
+                        
+            print("ERROR: Failed to load YOLOv8 model")
+            logger.error("Failed to load YOLOv8 model")
+        return False
+    
+    def detect_and_draw(self, image_data):
+        """Detect objects in image and draw bounding boxes"""
+        if self.model is None:
+            logger.error("YOLOv8 model not loaded. Cannot perform detection.")
+            # Just return the original image without processing
+            return image_data
+        
+        try:
+            # Convert binary image data to PIL Image
+            pil_image = Image.open(io.BytesIO(image_data))
+            
+            # Convert PIL Image to OpenCV format (numpy array)
+            cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            
+            # Run YOLOv8 inference
+            results = self.model(cv_image)
+            
+            # Draw detection results on the image
+            for result in results:
+                boxes = result.boxes
+                for i, box in enumerate(boxes):
+                    # Get box coordinates, confidence and class
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    confidence = box.conf[0].item()
+                    cls_id = int(box.cls[0].item())
+                    
+                    # Convert to integers
+                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                    
+                    # Get class name
+                    class_name = YOLO_CLASS_NAMES[cls_id] if cls_id < len(YOLO_CLASS_NAMES) else f"Class {cls_id}"
+                    
+                    # Draw bounding box
+                    cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    
+                    # Draw label background
+                    text = f"{class_name}: {confidence:.2f}"
+                    text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+                    cv2.rectangle(cv_image, (x1, y1 - text_size[1] - 5), (x1 + text_size[0], y1), (0, 255, 0), -1)
+                    
+                    # Draw label text
+                    cv2.putText(cv_image, text, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+            
+            # Convert back to PIL Image
+            pil_image_result = Image.fromarray(cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB))
+            
+            # Convert to binary data
+            img_byte_arr = io.BytesIO()
+            pil_image_result.save(img_byte_arr, format=pil_image.format or 'JPEG')
+            img_byte_arr = img_byte_arr.getvalue()
+            
+            logger.info(f"YOLOv8 detection completed with {len(results[0].boxes)} detections")
+            return img_byte_arr
+            
+        except Exception as e:
+            logger.error(f"Error in YOLOv8 detection: {e}")
+            return image_data  # Return original image on error
 
 class DrowsinessDetector:
     def __init__(self):
@@ -115,8 +252,9 @@ class DrowsinessDetector:
             logger.error(f"Error in drowsiness detection: {e}")
             return None
 
-# Initialize detector
+# Initialize detectors
 detector = DrowsinessDetector()
+traffic_detector = TrafficDetector()
 
 # Initialize MQTT client
 def setup_mqtt():
@@ -273,11 +411,18 @@ def esp32_camera_handler(ws):
             # Log message size
             logger.info(f"Received image from ESP32 camera: {len(message)} bytes")
             
-            # Store the image for new clients
-            last_esp32_image = message
+            # Process image with YOLOv8 - Detect objects and draw bounding boxes
+            # Only if the model is available
+            if traffic_detector.model is not None:
+                processed_image = traffic_detector.detect_and_draw(message)
+                last_esp32_image = processed_image
+            else:
+                # Skip detection if model isn't loaded
+                logger.warning("Skipping traffic detection (model not available)")
+                last_esp32_image = message
             
-            # Forward binary image data to all Socket.IO clients
-            sio.emit('frontcam', message)
+            # Forward processed or original image data to all Socket.IO clients
+            sio.emit('frontcam', last_esp32_image)
     except Exception as e:
         logger.error(f"ESP32 camera WebSocket error: {e}")
     finally:
