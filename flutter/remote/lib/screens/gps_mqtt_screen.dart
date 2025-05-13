@@ -300,162 +300,168 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Trạng thái dịch vụ GPS-MQTT',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Trạng thái dịch vụ GPS-MQTT',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Status card
-            Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    StatusItem(
-                      title: 'Khởi tạo dịch vụ GPS:',
-                      value: _isInitialized ? 'Đã khởi tạo' : 'Chưa khởi tạo',
-                      isActive: _isInitialized,
-                    ),
-                    StatusItem(
-                      title: 'MQTT gửi GPS:',
-                      value: _isGpsServiceMqttConnected
-                          ? 'Đã kết nối'
-                          : 'Chưa kết nối',
-                      isActive: _isGpsServiceMqttConnected,
-                    ),
-                    StatusItem(
-                      title: 'MQTT bản đồ:',
-                      value:
-                          _isMapMqttConnected ? 'Đã kết nối' : 'Chưa kết nối',
-                      isActive: _isMapMqttConnected,
-                    ),
-                    StatusItem(
-                      title: 'Trạng thái gửi GPS:',
-                      value: _isRunning ? 'Đang chạy' : 'Đã dừng',
-                      isActive: _isRunning,
-                    ),
-                    const StatusItem(
-                      title: 'Địa chỉ máy chủ MQTT:',
-                      value: AppConfig.MQTT_HOST,
-                      isActive: true,
-                    ),
-                    const StatusItem(
-                      title: 'Topic GPS:',
-                      value: AppConfig.MQTT_GPS_TOPIC,
-                      isActive: true,
-                    ),
-                    const StatusItem(
-                      title: 'Tần suất gửi:',
-                      value: '${AppConfig.LOCATION_UPDATE_INTERVAL}ms',
-                      isActive: true,
-                    ),
-                    StatusItem(
-                      title: 'Số tin nhắn đã gửi:',
-                      value: _isRunning ? '$_messagesSent' : 'N/A', // Updated
-                      isActive: _isRunning,
-                    ),
-                    const Divider(),
-                    Text(
-                      'Trạng thái: $_status',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+              // Status card
+              Card(
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      StatusItem(
+                        title: 'Khởi tạo dịch vụ GPS:',
+                        value: _isInitialized ? 'Đã khởi tạo' : 'Chưa khởi tạo',
+                        isActive: _isInitialized,
+                      ),
+                      StatusItem(
+                        title: 'MQTT gửi GPS:',
+                        value: _isGpsServiceMqttConnected
+                            ? 'Đã kết nối'
+                            : 'Chưa kết nối',
+                        isActive: _isGpsServiceMqttConnected,
+                      ),
+                      StatusItem(
+                        title: 'MQTT bản đồ:',
+                        value:
+                            _isMapMqttConnected ? 'Đã kết nối' : 'Chưa kết nối',
+                        isActive: _isMapMqttConnected,
+                      ),
+                      StatusItem(
+                        title: 'Trạng thái gửi GPS:',
+                        value: _isRunning ? 'Đang chạy' : 'Đã dừng',
+                        isActive: _isRunning,
+                      ),
+                      const StatusItem(
+                        title: 'Địa chỉ máy chủ MQTT:',
+                        value: AppConfig.MQTT_HOST,
+                        isActive: true,
+                      ),
+                      const StatusItem(
+                        title: 'Topic GPS:',
+                        value: AppConfig.MQTT_GPS_TOPIC,
+                        isActive: true,
+                      ),
+                      const StatusItem(
+                        title: 'Tần suất gửi:',
+                        value: '${AppConfig.LOCATION_UPDATE_INTERVAL}ms',
+                        isActive: true,
+                      ),
+                      StatusItem(
+                        title: 'Số tin nhắn đã gửi:',
+                        value: _isRunning ? '$_messagesSent' : 'N/A', // Updated
+                        isActive: _isRunning,
+                      ),
+                      const Divider(),
+                      Text(
+                        'Trạng thái: $_status',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
 
-                    // Reconnect button
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12.0),
-                      child: Center(
-                        child: ElevatedButton.icon(
-                          onPressed: _reconnectMqtt,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Kết nối lại MQTT'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
+                      // Reconnect button
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
+                        child: Center(
+                          child: ElevatedButton.icon(
+                            onPressed: _reconnectMqtt,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Kết nối lại MQTT'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Map View
+              SizedBox(
+                height: 300,
+                child: Card(
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: _currentMapPosition,
+                        zoom: 16.0,
+                      ),
+                      onMapCreated: (GoogleMapController controller) {
+                        _mapController = controller;
+                      },
+                      markers: _markers,
+                      myLocationEnabled:
+                          false, // Set to true if you want to show device's blue dot
+                      myLocationButtonEnabled: false,
+                      mapType: MapType.normal,
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Control buttons (Keep this section)
+              Center(
+                child: Column(
+                  children: [
+                    ElevatedButton(
+                      onPressed:
+                          _isInitialized ? _toggleService : _initializeServices,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 16),
+                        backgroundColor:
+                            _isRunning ? Colors.redAccent : Colors.green,
+                      ),
+                      child: Text(
+                        _isInitialized
+                            ? (_isRunning ? 'Dừng gửi GPS' : 'Bắt đầu gửi GPS')
+                            : 'Khởi tạo dịch vụ',
+                        style: const TextStyle(fontSize: 16, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (!_isInitialized)
+                      const Text(
+                        'Bạn cần khởi tạo dịch vụ trước khi sử dụng.',
+                        style: TextStyle(color: Colors.red),
+                      ),
                   ],
                 ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              // const Spacer(), // Remove Spacer
+              const SizedBox(height: 16), // Add some space before footer
 
-            // Map View
-            Expanded(
-              child: Card(
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: _currentMapPosition,
-                      zoom: 16.0,
-                    ),
-                    onMapCreated: (GoogleMapController controller) {
-                      _mapController = controller;
-                    },
-                    markers: _markers,
-                    myLocationEnabled:
-                        false, // Set to true if you want to show device's blue dot
-                    myLocationButtonEnabled: false,
-                    mapType: MapType.normal,
-                  ),
+              // Footer (Keep this section)
+              const Center(
+                child: Text(
+                  'Dữ liệu GPS sẽ được gửi tới MQTT broker mỗi giây',
+                  style: TextStyle(color: Colors.grey),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-
-            // Control buttons
-            Center(
-              child: Column(
-                children: [
-                  ElevatedButton(
-                    onPressed:
-                        _isInitialized ? _toggleService : _initializeServices,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 16),
-                      backgroundColor:
-                          _isRunning ? Colors.redAccent : Colors.green,
-                    ),
-                    child: Text(
-                      _isInitialized
-                          ? (_isRunning ? 'Dừng gửi GPS' : 'Bắt đầu gửi GPS')
-                          : 'Khởi tạo dịch vụ',
-                      style: const TextStyle(fontSize: 16, color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (!_isInitialized)
-                    const Text(
-                      'Bạn cần khởi tạo dịch vụ trước khi sử dụng.',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                ],
-              ),
-            ),
-
-            const Spacer(),
-
-            // Footer
-            const Center(
-              child: Text(
-                'Dữ liệu GPS sẽ được gửi tới MQTT broker mỗi giây',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-          ],
+              const SizedBox(height: 16), // Add padding at the bottom
+            ],
+          ),
         ),
       ),
     );
