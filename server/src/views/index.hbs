@@ -1,0 +1,60 @@
+<div class="welcome-section">
+  <h1>Hệ thống quản lý giao thông thông minh</h1>
+  <p>Chào mừng đến với hệ thống quản lý giao thông thông minh của chúng tôi.</p>
+</div>
+
+<div class="row">
+  <div class="card">
+    <h2 class="card-title">Giám sát camera</h2>
+    <p>Xem thông tin video từ các camera giám sát giao thông.</p>
+    <a href="/camera" class="btn">Truy cập</a>
+  </div>
+
+  <div class="card">
+    <h2 class="card-title">Kiểm soát đèn giao thông</h2>
+    <p>Điều khiển và giám sát đèn giao thông thông minh.</p>
+    <a href="/traffic-lights" class="btn">Truy cập</a>
+  </div>
+
+  <div class="card">
+    <h2 class="card-title">Báo cáo phân tích</h2>
+    <p>Xem các báo cáo và phân tích dữ liệu giao thông.</p>
+    <a href="/reports" class="btn">Truy cập</a>
+  </div>
+</div>
+
+<div class="stats-section">
+  <h2>Thống kê hiện tại</h2>
+  <div class="stats-container">
+    <div class="stat-item">
+      <h3>Tổng số camera</h3>
+      <p class="stat-number">24</p>
+    </div>
+    <div class="stat-item">
+      <h3>Đèn giao thông</h3>
+      <p class="stat-number">16</p>
+    </div>
+    <div class="stat-item">
+      <h3>Tổng số sự cố</h3>
+      <p class="stat-number">3</p>
+    </div>
+    <div class="stat-item">
+      <h3>Mật độ giao thông</h3>
+      <p class="stat-number">Trung bình</p>
+    </div>
+  </div>
+</div>
+
+{{! Add additional CSS for this page }}
+<style>
+  .welcome-section { text-align: center; margin-bottom: 2rem; } .welcome-section
+  h1 { color: #2c3e50; margin-bottom: 1rem; } .row { display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;
+  margin-bottom: 2rem; } .stats-section { margin-top: 2rem; } .stats-section h2
+  { margin-bottom: 1rem; color: #2c3e50; } .stats-container { display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+  .stat-item { background-color: #fff; border-radius: 5px; box-shadow: 0 2px 5px
+  rgba(0,0,0,0.1); padding: 1rem; text-align: center; } .stat-item h3 {
+  font-size: 1rem; color: #7f8c8d; margin-bottom: 0.5rem; } .stat-number {
+  font-size: 1.5rem; font-weight: bold; color: #2c3e50; }
+</style>
