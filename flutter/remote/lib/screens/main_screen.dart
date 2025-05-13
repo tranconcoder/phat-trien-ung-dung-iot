@@ -3,6 +3,7 @@ import 'gps_mqtt_screen.dart';
 import 'settings_screen.dart';
 import 'control_panel_screen.dart';
 import 'vehicle_metrics_screen.dart';
+import 'driver_camera_tab.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -18,6 +19,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = const [
     GpsMqttScreen(),
     ControlPanelScreen(),
+    DriverCameraTab(),
     VehicleMetricsScreen(),
     SettingsScreen(),
   ];
@@ -42,6 +44,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.drive_eta),
             label: 'Điều khiển',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.face),
+            label: 'Driver Cam',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.speed),

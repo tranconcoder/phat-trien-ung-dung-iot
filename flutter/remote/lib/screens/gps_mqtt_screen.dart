@@ -55,7 +55,7 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
   @override
   void dispose() {
     _gpsMqttService.dispose();
-    _mapMqttService.disconnect(); // Disconnect map MQTT service
+    _mapMqttService.disconnect(); // Remove await since this returns void
     _gpsServiceMqttStatusSubscription?.cancel();
     _mapMqttStatusSubscription?.cancel();
     _gpsDataSubscription?.cancel();
@@ -208,7 +208,7 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
     bool gpsServiceReconnected = await _gpsMqttService.initialize();
 
     // Reconnect Map MQTT service
-    await _mapMqttService.disconnect();
+    _mapMqttService.disconnect(); // Remove await since this returns void
     bool mapServiceReconnected = await _mapMqttService.connect();
 
     if (mounted) {
@@ -422,7 +422,7 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
                 children: [
                   ElevatedButton(
                     onPressed:
-                        _isInitialized ? _toggleService : _initializeService,
+                        _isInitialized ? _toggleService : _initializeServices,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 32, vertical: 16),

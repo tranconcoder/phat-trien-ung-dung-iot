@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
-import 'package:camera/camera.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
-import 'package:web_socket_channel/web_socket_channel.dart';
 import '../config/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mqtt_client/mqtt_client.dart';
@@ -21,10 +19,6 @@ class ControlPanelScreen extends StatefulWidget {
 class _ControlPanelScreenState extends State<ControlPanelScreen> {
   // Socket.IO client
   late IO.Socket socket;
-
-  // WebSocket for camera streaming
-  WebSocketChannel? _cameraWebSocket;
-  bool _isCameraWebSocketConnected = false;
 
   // Connection state
   bool _isConnected = false;
@@ -47,20 +41,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   // Image data
   Uint8List? _mainImageBytes;
   DateTime _lastImageUpdate = DateTime.now();
-  Uint8List? _driverCameraImageBytes;
-  DateTime _lastDriverImageUpdate = DateTime.now();
-
-  // Front camera controller
-  CameraController? _frontCameraController;
-  List<CameraDescription> cameras = [];
-  bool _frontCameraInitialized = false;
-  bool _isSendingCameraFeed = false; // Track if we're sending camera frames
-  Timer? _cameraStreamTimer;
-  int _cameraStreamInterval =
-      10; // Milliseconds between frames (high frame rate)
-  bool _processingFrame = false; // To prevent overlapping frame captures
-  int _frameCounter = 0; // Count frames for throttling
-  int _frameThrottleRate = 1; // Send 1 out of every X frames
 
   // MQTT client for turn signals
   MqttServerClient? _mqttClient;
@@ -82,7 +62,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     // Load saved IPs
     Future.wait([_loadCarIp(), _loadWsIp()]).then((_) {
       _initializeSocketConnection();
-      _initializeFrontCamera();
     });
   }
 
@@ -121,46 +100,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
         _isConnecting = false;
         _isInitialized = true;
       });
-    }
-  }
-
-  Future<void> _initializeFrontCamera() async {
-    try {
-      cameras = await availableCameras();
-
-      // Find the front camera
-      CameraDescription? frontCamera;
-      for (var camera in cameras) {
-        if (camera.lensDirection == CameraLensDirection.front) {
-          frontCamera = camera;
-          break;
-        }
-      }
-
-      if (frontCamera != null) {
-        _frontCameraController = CameraController(
-          frontCamera,
-          ResolutionPreset.low, // Use low resolution for streaming
-          enableAudio: false,
-          imageFormatGroup:
-              ImageFormatGroup.jpeg, // Use JPEG for better compression
-        );
-
-        await _frontCameraController!.initialize();
-
-        if (mounted) {
-          setState(() {
-            _frontCameraInitialized = true;
-          });
-
-          // Start sending camera frames if connected
-          if (_isConnected) {
-            _startCameraStream();
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error initializing front camera: $e');
     }
   }
 
@@ -209,15 +148,8 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   @override
   void dispose() {
     _connectionTimer?.cancel();
-    _cameraStreamTimer?.cancel();
     _ipController.dispose();
     _wsIpController.dispose();
-
-    // Stop camera stream
-    _stopCameraStream();
-
-    // Close camera WebSocket
-    _closeCameraWebSocket();
 
     // Disconnect MQTT client
     _mqttClient?.disconnect();
@@ -230,7 +162,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
       debugPrint('Error disposing socket: $e');
     }
 
-    _frontCameraController?.dispose();
     super.dispose();
   }
 
@@ -422,9 +353,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
       // Disconnect from current socket
       socket.disconnect();
 
-      // Close camera WebSocket if active
-      _closeCameraWebSocket();
-
       // Create new Socket.IO URL
       final newSocketIoUrl = 'http://$newIp:4001';
       debugPrint('Connecting to new Socket.IO URL: $newSocketIoUrl');
@@ -442,11 +370,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
 
       // Connect to the new server
       socket.connect();
-
-      // Restart camera stream if it was active
-      if (_isSendingCameraFeed) {
-        _startCameraStream();
-      }
 
       // Show feedback
       ScaffoldMessenger.of(context).showSnackBar(
@@ -479,14 +402,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
 
         // Request latest front camera image
         _requestFrontCamImage();
-
-        // Request latest driver camera image
-        _requestDriverCamImage();
-
-        // Start camera stream when connected
-        if (_frontCameraInitialized) {
-          _startCameraStream();
-        }
       }
     });
 
@@ -498,9 +413,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
           _isConnecting = false;
           _mainImageError = true;
         });
-
-        // Stop camera stream when disconnected
-        _stopCameraStream();
       }
     });
 
@@ -518,27 +430,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
         }
       } catch (e) {
         debugPrint('Error processing ESP32 camera image: $e');
-      }
-    });
-
-    // Receive driver camera images (from /drivercam)
-    socket.on('drivercam', (data) {
-      if (!mounted) return;
-      try {
-        if (data is Uint8List) {
-          debugPrint('Received driver camera data: ${data.length} bytes');
-
-          // Store the image data to display in a secondary view if needed
-          setState(() {
-            _driverCameraImageBytes = data;
-            _lastDriverImageUpdate = DateTime.now();
-          });
-
-          // You could update a separate image display widget here
-          // or just log receipt as we're doing now
-        }
-      } catch (e) {
-        debugPrint('Error processing driver camera image: $e');
       }
     });
 
@@ -574,18 +465,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     }
   }
 
-  // Request driver camera image from server
-  void _requestDriverCamImage() {
-    if (!_isConnected) return;
-
-    try {
-      debugPrint('Requesting driver camera image from server');
-      socket.emit('drivercam');
-    } catch (e) {
-      debugPrint('Error requesting driver camera image: $e');
-    }
-  }
-
   // Save car IP to shared preferences
   Future<void> _saveCarIp(String ip) async {
     try {
@@ -611,444 +490,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
       }
     } catch (e) {
       debugPrint('Error loading car IP: $e');
-    }
-  }
-
-  // Start sending camera frames to server via WebSocket
-  void _startCameraStream() {
-    if (_frontCameraController == null ||
-        !_frontCameraController!.value.isInitialized ||
-        _isSendingCameraFeed) return;
-
-    // Connect to WebSocket first
-    _connectCameraWebSocket();
-
-    setState(() => _isSendingCameraFeed = true);
-
-    _cameraStreamTimer?.cancel();
-    _cameraStreamTimer =
-        Timer.periodic(Duration(milliseconds: _cameraStreamInterval), (_) {
-      _captureAndSendFrame();
-    });
-
-    // Add periodic connection verification
-    Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!_isSendingCameraFeed) {
-        timer.cancel();
-        return;
-      }
-      _verifyWebSocketConnectivity();
-    });
-
-    debugPrint('Started camera stream');
-  }
-
-  // Stop sending camera frames
-  void _stopCameraStream() {
-    _cameraStreamTimer?.cancel();
-    _cameraStreamTimer = null;
-    setState(() => _isSendingCameraFeed = false);
-    _closeCameraWebSocket();
-    debugPrint('Stopped camera stream');
-  }
-
-  // Connect to the driver camera WebSocket
-  void _connectCameraWebSocket() {
-    try {
-      // Close any existing connection
-      _closeCameraWebSocket();
-
-      // Create a new WebSocket connection for driver camera
-      final wsUrl = 'ws://$_websocketIpAddress:8887/drivercam';
-      debugPrint('Connecting to driver camera WebSocket: $wsUrl');
-
-      _cameraWebSocket = WebSocketChannel.connect(Uri.parse(wsUrl));
-
-      // Update state after connection attempt starts
-      setState(() {
-        _isCameraWebSocketConnected = true;
-      });
-
-      // Listen for messages (optional, if the server sends responses)
-      _cameraWebSocket!.stream.listen((message) {
-        debugPrint('Received camera WebSocket message from server');
-
-        // Ensure we're still marked as connected
-        if (mounted && !_isCameraWebSocketConnected) {
-          setState(() {
-            _isCameraWebSocketConnected = true;
-          });
-        }
-      }, onError: (error) {
-        debugPrint('Camera WebSocket error: $error');
-        if (mounted) {
-          setState(() {
-            _isCameraWebSocketConnected = false;
-          });
-        }
-
-        // Retry connection after a delay
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted && _isSendingCameraFeed && !_isCameraWebSocketConnected) {
-            debugPrint('Retrying camera WebSocket connection...');
-            _connectCameraWebSocket();
-          }
-        });
-      }, onDone: () {
-        debugPrint('Camera WebSocket connection closed');
-        if (mounted) {
-          setState(() {
-            _isCameraWebSocketConnected = false;
-          });
-        }
-
-        // Retry connection after a delay if we're still trying to stream
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted && _isSendingCameraFeed && !_isCameraWebSocketConnected) {
-            debugPrint('Retrying camera WebSocket connection after close...');
-            _connectCameraWebSocket();
-          }
-        });
-      });
-
-      // Send a test message to verify connection
-      _cameraWebSocket!.sink.add(Uint8List(1));
-      debugPrint('Sent test message to camera WebSocket');
-    } catch (e) {
-      debugPrint('Error connecting to camera WebSocket: $e');
-      if (mounted) {
-        setState(() {
-          _isCameraWebSocketConnected = false;
-        });
-      }
-
-      // Retry connection after a delay
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted && _isSendingCameraFeed) {
-          debugPrint('Retrying camera WebSocket connection after error...');
-          _connectCameraWebSocket();
-        }
-      });
-    }
-  }
-
-  // Close the WebSocket connection
-  void _closeCameraWebSocket() {
-    if (_cameraWebSocket != null) {
-      try {
-        _cameraWebSocket!.sink.close();
-        debugPrint('Closed camera WebSocket connection');
-      } catch (e) {
-        debugPrint('Error closing camera WebSocket: $e');
-      }
-      _cameraWebSocket = null;
-    }
-
-    if (mounted) {
-      setState(() {
-        _isCameraWebSocketConnected = false;
-      });
-    }
-  }
-
-  // Capture and send a single frame via WebSocket to /drivercam
-  Future<void> _captureAndSendFrame() async {
-    if (!mounted ||
-        _frontCameraController == null ||
-        !_frontCameraController!.value.isInitialized ||
-        !_isCameraWebSocketConnected ||
-        _processingFrame) {
-      return;
-    }
-
-    // Increment frame counter for throttling
-    _frameCounter++;
-
-    // Only process every nth frame based on throttle rate
-    if (_frameCounter % _frameThrottleRate != 0) {
-      return;
-    }
-
-    try {
-      _processingFrame = true;
-
-      // Check camera availability to avoid errors
-      if (!_frontCameraController!.value.isInitialized ||
-          _frontCameraController!.value.isTakingPicture) {
-        _processingFrame = false;
-        return;
-      }
-
-      // Use safer approach - no timeout handlers that return null
-      XFile? image;
-      try {
-        // Capture an image from the camera with lower quality for streaming
-        image = await _frontCameraController!.takePicture();
-      } catch (e) {
-        debugPrint('Error taking picture: $e');
-        _processingFrame = false;
-        return;
-      }
-
-      // Read the image bytes - safely
-      Uint8List imageBytes;
-      try {
-        imageBytes = await image.readAsBytes();
-      } catch (e) {
-        debugPrint('Error reading image bytes: $e');
-        _processingFrame = false;
-        return;
-      }
-
-      // Send via WebSocket if connected to /drivercam
-      if (_cameraWebSocket != null &&
-          _isSendingCameraFeed &&
-          _isCameraWebSocketConnected) {
-        try {
-          _cameraWebSocket!.sink.add(imageBytes);
-          debugPrint(
-              'Sent phone camera frame to /drivercam: ${imageBytes.length} bytes');
-        } catch (e) {
-          debugPrint('Error sending frame over WebSocket: $e');
-          // Mark connection as broken if we have send errors
-          if (mounted) {
-            setState(() {
-              _isCameraWebSocketConnected = false;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error capturing/sending frame: $e');
-    } finally {
-      _processingFrame = false;
-    }
-  }
-
-  // Toggle camera stream on/off
-  void _toggleCameraStream() {
-    if (_isSendingCameraFeed) {
-      _stopCameraStream();
-    } else {
-      _startCameraStream();
-    }
-  }
-
-  // Show camera settings dialog with WebSocket information
-  void _showCameraSettingsDialog() {
-    final TextEditingController intervalController =
-        TextEditingController(text: _cameraStreamInterval.toString());
-    final TextEditingController throttleController =
-        TextEditingController(text: _frameThrottleRate.toString());
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Camera Stream Settings',
-            style: TextStyle(fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // WebSocket info
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'WebSocket: ws://$_websocketIpAddress:8887/drivercam',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _isCameraWebSocketConnected
-                              ? Colors.green
-                              : Colors.red,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _isCameraWebSocketConnected
-                            ? 'Connected'
-                            : 'Disconnected',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _isCameraWebSocketConnected
-                              ? Colors.green
-                              : Colors.red,
-                        ),
-                      ),
-                      const Spacer(),
-                      // Add reconnect button
-                      GestureDetector(
-                        onTap: () {
-                          _closeCameraWebSocket();
-                          _connectCameraWebSocket();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('Reconnecting to camera WebSocket...'),
-                              duration: Duration(seconds: 1),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.refresh, size: 12, color: Colors.blue),
-                              SizedBox(width: 2),
-                              Text('Reconnect',
-                                  style: TextStyle(
-                                      fontSize: 10, color: Colors.blue)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: intervalController,
-              decoration: const InputDecoration(
-                labelText: 'Frame interval (ms)',
-                hintText: '30 = 33 frames per second',
-                labelStyle: TextStyle(fontSize: 14),
-                hintStyle: TextStyle(fontSize: 12),
-              ),
-              keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 14),
-            ),
-
-            const SizedBox(height: 10),
-
-            TextField(
-              controller: throttleController,
-              decoration: const InputDecoration(
-                labelText: 'Throttle rate (1 of X frames)',
-                hintText: 'Higher = less bandwidth',
-                labelStyle: TextStyle(fontSize: 14),
-                hintStyle: TextStyle(fontSize: 12),
-              ),
-              keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 14),
-            ),
-
-            const SizedBox(height: 10),
-
-            Text(
-              'Current: ${_cameraStreamInterval}ms / ${_frameThrottleRate}x throttle',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-
-            const SizedBox(height: 5),
-
-            Text(
-              'Effective FPS: ~${1000 ~/ (_cameraStreamInterval * _frameThrottleRate)}',
-              style: TextStyle(fontSize: 12, color: Colors.orange),
-            ),
-
-            const SizedBox(height: 5),
-
-            const Text(
-              'High FPS = smoother video but more data usage',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(fontSize: 14)),
-          ),
-          TextButton(
-            onPressed: () {
-              final newInterval = int.tryParse(intervalController.text.trim());
-              final newThrottle = int.tryParse(throttleController.text.trim());
-
-              if (newInterval != null && newInterval >= 30) {
-                setState(() => _cameraStreamInterval = newInterval);
-              }
-
-              if (newThrottle != null && newThrottle >= 1) {
-                setState(() => _frameThrottleRate = newThrottle);
-              }
-
-              // Restart stream if it was active
-              if (_isSendingCameraFeed) {
-                _stopCameraStream();
-                _startCameraStream();
-              }
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      'Set to ~${1000 ~/ (_cameraStreamInterval * _frameThrottleRate)} FPS'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-
-              Navigator.pop(context);
-            },
-            child: const Text('Save', style: TextStyle(fontSize: 14)),
-          ),
-        ],
-      ),
-    ).then((_) {
-      intervalController.dispose();
-      throttleController.dispose();
-    });
-  }
-
-  // Verify WebSocket connectivity
-  void _verifyWebSocketConnectivity() {
-    if (!_isConnected) {
-      debugPrint('Socket.IO not connected, skipping WebSocket verification');
-      return;
-    }
-
-    if (_cameraWebSocket == null) {
-      debugPrint('No active WebSocket connection, attempting to reconnect');
-      _closeCameraWebSocket(); // Ensure clean state
-      _connectCameraWebSocket();
-      return;
-    }
-
-    try {
-      // Send a small ping message to verify connection is alive
-      _cameraWebSocket!.sink.add(Uint8List.fromList([0]));
-      debugPrint('Sent WebSocket verification ping');
-    } catch (e) {
-      debugPrint('Error verifying WebSocket connection: $e');
-      // Connection likely broken, try to reconnect
-      _closeCameraWebSocket();
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && _isSendingCameraFeed) {
-          _connectCameraWebSocket();
-        }
-      });
     }
   }
 
@@ -1196,22 +637,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
             ),
           ],
         ),
-
-        // Floating front camera
-        if (_frontCameraInitialized && _frontCameraController != null)
-          Positioned(
-            top: 16,
-            right: 16,
-            child: _buildFloatingCamera(),
-          ),
-
-        // Driver camera view - positioned at the bottom left
-        if (_driverCameraImageBytes != null || _isConnected)
-          Positioned(
-            bottom: 80,
-            left: 16,
-            child: _buildDriverCameraView(),
-          ),
       ],
     );
   }
@@ -1567,202 +992,6 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // Floating front camera with long press for settings
-  Widget _buildFloatingCamera() {
-    if (!_frontCameraInitialized || _frontCameraController == null) {
-      return const SizedBox();
-    }
-
-    // Calculate effective FPS with throttling
-    final effectiveFps = 1000 ~/ (_cameraStreamInterval * _frameThrottleRate);
-
-    return GestureDetector(
-      onTap: _toggleCameraStream,
-      onLongPress: _showCameraSettingsDialog,
-      child: Stack(
-        children: [
-          // Camera preview
-          Container(
-            height: 120,
-            width: 90,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: _isSendingCameraFeed ? Colors.red : Colors.white,
-                  width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                // Camera preview
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: CameraPreview(_frontCameraController!),
-                ),
-
-                // WebSocket endpoint indicator
-                Positioned(
-                  bottom: 5,
-                  left: 5,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      "/drivercam",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Streaming indicator
-          if (_isSendingCameraFeed)
-            Positioned(
-              top: 5,
-              right: 5,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      "LIVE ${effectiveFps}FPS",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 6,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // Add a method to build a small driver camera view
-  Widget _buildDriverCameraView() {
-    return Container(
-      height: 100,
-      width: 120,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: _driverCameraImageBytes != null
-              ? Colors.yellow
-              : Colors.grey.withOpacity(0.5),
-          width: 2,
-        ),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Show driver camera image if available
-          if (_driverCameraImageBytes != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.memory(
-                _driverCameraImageBytes!,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              ),
-            )
-          else
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.videocam_off,
-                    color: Colors.grey.withOpacity(0.5),
-                    size: 24,
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    "Driver Cam",
-                    style: TextStyle(color: Colors.grey, fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-
-          // Add label in corner
-          Positioned(
-            bottom: 5,
-            left: 5,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Text(
-                "Driver Camera",
-                style: TextStyle(
-                  color: Colors.yellow,
-                  fontSize: 8,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-
-          // Add refresh button
-          Positioned(
-            top: 5,
-            right: 5,
-            child: GestureDetector(
-              onTap: _requestDriverCamImage,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.refresh,
-                  color: Colors.white,
-                  size: 10,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

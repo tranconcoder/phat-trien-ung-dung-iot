@@ -33,7 +33,10 @@ class AppConfig {
   static const String APP_VERSION = '1.0.0';
 
   // Server Configuration
-  static const String SERVER_URL = 'http://192.168.1.12:4000';
+  static const String SERVER_URL = 'http://192.168.1.12:4001';
+
+  // WebSocket Configuration
+  static const String WEBSOCKET_URL = 'ws://192.168.1.12:8887';
 
   // Socket.IO Configuration
   static const String SOCKETIO_URL = 'http://192.168.1.12:4001';

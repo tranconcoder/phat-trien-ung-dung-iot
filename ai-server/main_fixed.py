@@ -9,10 +9,6 @@ import json
 import time
 from PIL import Image
 import paho.mqtt.client as mqtt
-import sys
-import subprocess
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -218,8 +214,16 @@ def drivercam(sid, data=None):
         logger.info(f"Received driver image from Socket.IO client {sid}, size: {len(data) if data else 'unknown'} bytes")
         last_driver_image = data
         
-        # Store the image but don't process for drowsiness detection here
-        # Drowsiness detection is already handled in the WebSocket handler
+        # Process image for drowsiness detection
+        drowsiness_result = detector.detect(data)
+        
+        # Send drowsiness result to MQTT if detection was successful
+        if drowsiness_result and mqtt_client:
+            try:
+                mqtt_client.publish(MQTT_TOPIC_DROWSY, json.dumps(drowsiness_result))
+                logger.info(f"Published drowsiness result to MQTT topic '{MQTT_TOPIC_DROWSY}': {drowsiness_result['result']} ({drowsiness_result['probability'] * 100:.2f}%)")
+            except Exception as e:
+                logger.error(f"Error publishing to MQTT: {e}")
         
         # Forward binary buffer directly to all other clients
         sio.emit('drivercam', data, skip_sid=sid)
@@ -254,15 +258,6 @@ def disconnect(sid):
 def esp32_camera_handler(ws):
     global last_esp32_image
     logger.info("New ESP32 camera WebSocket connection established")
-    
-    # If we already have an image, send it to the new client immediately
-    if last_esp32_image:
-        try:
-            ws.send(last_esp32_image)
-            logger.info(f"Sent last known image to new WebSocket client: {len(last_esp32_image)} bytes")
-        except Exception as e:
-            logger.error(f"Error sending last image to new client: {e}")
-    
     try:
         while True:
             # Receive binary data from ESP32 WebSocket client
@@ -303,13 +298,13 @@ def driver_camera_handler(ws):
             # Process image for drowsiness detection
             drowsiness_result = detector.detect(message)
             
-            # Send drowsiness result via Socket.IO for the Flutter app
-            if drowsiness_result:
+            # Send drowsiness result to MQTT if detection was successful
+            if drowsiness_result and mqtt_client:
                 try:
-                    sio.emit('drowsy', drowsiness_result)
-                    logger.info(f"Emitted drowsiness result via Socket.IO: {drowsiness_result['result']} ({drowsiness_result['probability'] * 100:.2f}%)")
+                    mqtt_client.publish(MQTT_TOPIC_DROWSY, json.dumps(drowsiness_result))
+                    logger.info(f"Published drowsiness result to MQTT topic '{MQTT_TOPIC_DROWSY}': {drowsiness_result['result']} ({drowsiness_result['probability'] * 100:.2f}%)")
                 except Exception as e:
-                    logger.error(f"Error emitting drowsiness result via Socket.IO: {e}")
+                    logger.error(f"Error publishing to MQTT: {e}")
             
             # Forward binary image data to all Socket.IO clients
             sio.emit('drivercam', message)
@@ -330,33 +325,7 @@ def get_websocket_handler_by_path(path):
         logger.error(f"Unknown WebSocket path: {path}")
         return None
 
-# Server startup section
 if __name__ == '__main__':
-    # Check if this is a restart attempt
-    is_restart = '--restart' in sys.argv
-    
-    # Add file watching for auto-restart on changes
-    class FileChangeHandler(FileSystemEventHandler):
-        def on_modified(self, event):
-            # Only watch the main script
-            if event.src_path.endswith('main.py'):
-                logger.info(f"File {event.src_path} has been modified. Restarting server...")
-                # Restart the script with the same arguments plus a restart flag
-                args = [sys.executable] + sys.argv + ['--restart']
-                subprocess.Popen(args)
-                os._exit(0)  # Exit the current process
-    
-    # Only set up file watching if not already in a restart
-    if not is_restart:
-        try:
-            observer = Observer()
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            observer.schedule(FileChangeHandler(), current_dir, recursive=False)
-            observer.start()
-            logger.info("File watcher started - server will auto-restart on changes")
-        except Exception as e:
-            logger.error(f"Failed to start file watcher: {e}")
-    
     # Use port 4001 for Socket.IO server
     socketio_port = 4001
     # Use port 8887 for WebSocket server (matching ESP32 client configuration)
@@ -374,8 +343,6 @@ if __name__ == '__main__':
     logger.info(f"Starting Socket.IO server on port {socketio_port}")
     logger.info(f"Starting WebSocket server on port {websocket_port}")
     logger.info(f"WebSocket routes: /frontcam (ESP32 camera), /drivercam (driver camera)")
-    if is_restart:
-        logger.info("This is a restart instance")
     
     # Clean up when the program exits
     try:
@@ -414,13 +381,4 @@ if __name__ == '__main__':
         # Disconnect MQTT client when the program exits
         if mqtt_client:
             mqtt_client.loop_stop()
-            mqtt_client.disconnect()
-        
-        # Stop the file observer if it was started
-        if not is_restart and 'observer' in locals():
-            try:
-                observer.stop()
-                observer.join()
-                logger.info("File watcher stopped")
-            except Exception as e:
-                logger.error(f"Error stopping file watcher: {e}")
+            mqtt_client.disconnect() 
