@@ -23,7 +23,7 @@ class AppConfig {
 
   static const int MQTT_KEEP_ALIVE = 30;
   static const int MQTT_RECONNECT_DELAY = 5; // seconds
-  static const String MQTT_USERNAME = 'trancon2';
+  static const String MQTT_USERNAME = 'trancon';
   static const String MQTT_PASSWORD = '123';
 
   // Map Configuration
@@ -45,5 +45,5 @@ class AppConfig {
   static const String APP_VERSION = '1.0.0';
 
   // Server Configuration
-  static const String SERVER_URL = 'http://192.168.1.101:4000';
+  static const String SERVER_URL = 'http://192.168.1.92:4000';
 }

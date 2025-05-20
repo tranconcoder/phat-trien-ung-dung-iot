@@ -379,11 +379,11 @@ class _VehicleTabState extends State<VehicleTab> {
                                   padding: EdgeInsets.zero,
                                   elevation: 3,
                                 ),
-                                child: Icon(Icons.arrow_upward, size: iconSize),
+                                child: const Icon(Icons.arrow_upward, size: iconSize),
                               ),
                             ),
                           ),
-                          SizedBox(height: spacing),
+                          const SizedBox(height: spacing),
 
                           // Left and Right buttons in a row - evenly spaced
                           Row(
@@ -404,7 +404,7 @@ class _VehicleTabState extends State<VehicleTab> {
                                     padding: EdgeInsets.zero,
                                     elevation: 3,
                                   ),
-                                  child: Icon(Icons.arrow_back, size: iconSize),
+                                  child: const Icon(Icons.arrow_back, size: iconSize),
                                 ),
                               ),
 
@@ -423,7 +423,7 @@ class _VehicleTabState extends State<VehicleTab> {
                                     padding: EdgeInsets.zero,
                                     elevation: 3,
                                   ),
-                                  child: Icon(
+                                  child: const Icon(
                                     Icons.arrow_forward,
                                     size: iconSize,
                                   ),
@@ -431,7 +431,7 @@ class _VehicleTabState extends State<VehicleTab> {
                               ),
                             ],
                           ),
-                          SizedBox(height: spacing),
+                          const SizedBox(height: spacing),
 
                           // Backward button - centered
                           Center(
@@ -449,7 +449,7 @@ class _VehicleTabState extends State<VehicleTab> {
                                   padding: EdgeInsets.zero,
                                   elevation: 3,
                                 ),
-                                child: Icon(
+                                child: const Icon(
                                   Icons.arrow_downward,
                                   size: iconSize,
                                 ),

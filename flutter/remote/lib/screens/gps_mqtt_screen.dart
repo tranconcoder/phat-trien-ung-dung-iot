@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert'; // Added for jsonDecode
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart'; // Added for Google Maps
 import '../services/gps_mqtt_service.dart';
 import '../services/mqtt_service.dart';
@@ -128,13 +127,11 @@ class _GpsMqttScreenState extends State<GpsMqttScreen> {
           setState(() {
             _isMapMqttConnected = connected;
             if (!connected) {
-              _status = _status.replaceAll('MQTT bản đồ đã kết nối.', '') +
-                  'MQTT bản đồ bị mất kết nối.';
+              _status = '${_status.replaceAll('MQTT bản đồ đã kết nối.', '')}MQTT bản đồ bị mất kết nối.';
               // Attempt to reconnect map MQTT service
               _mapMqttService.connect();
             } else {
-              _status = _status.replaceAll('MQTT bản đồ bị mất kết nối.', '') +
-                  'MQTT bản đồ đã kết nối.';
+              _status = '${_status.replaceAll('MQTT bản đồ bị mất kết nối.', '')}MQTT bản đồ đã kết nối.';
               _listenToGpsMessages(); // Re-listen if not already
             }
           });

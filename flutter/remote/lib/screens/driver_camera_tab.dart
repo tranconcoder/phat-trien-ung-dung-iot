@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -48,8 +47,8 @@ class _DriverCameraTabState extends State<DriverCameraTab>
   bool _isCapturing = false;
   bool _processingFrame = false;
   int _frameCount = 0;
-  int _frameInterval = 200; // ms between frames
-  int _frameThrottle = 3; // Only send 1 of every X frames
+  final int _frameInterval = 200; // ms between frames
+  final int _frameThrottle = 3; // Only send 1 of every X frames
 
   // Server connection
   String _serverIp = "";

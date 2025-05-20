@@ -23,9 +23,9 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _screens = [
-      GpsMqttScreen(),
-      ControlPanelScreen(),
-      DriverCameraTab(),
+      const GpsMqttScreen(),
+      const ControlPanelScreen(),
+      const DriverCameraTab(),
     ];
   }
 

@@ -5,7 +5,6 @@ import 'package:quan_ly_giao_thong/services/auth_service.dart';
 import 'package:quan_ly_giao_thong/screens/dashboard_screen.dart';
 import 'package:quan_ly_giao_thong/screens/login_screen.dart';
 import 'package:quan_ly_giao_thong/screens/profile_screen.dart';
-import 'package:quan_ly_giao_thong/config/app_config.dart';
 import 'package:quan_ly_giao_thong/screens/map_screen.dart';
 
 void main() {
@@ -21,7 +20,7 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       title: 'Car Manager',
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      initialRoute: '/login',
+      initialRoute: '/home',
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomePage(),

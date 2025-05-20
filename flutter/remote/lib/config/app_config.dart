@@ -11,7 +11,7 @@ class AppConfig {
 
   static const int MQTT_KEEP_ALIVE = 30;
   static const int MQTT_RECONNECT_DELAY = 5; // seconds
-  static const String MQTT_USERNAME = 'trancon2';
+  static const String MQTT_USERNAME = 'trancon';
   static const String MQTT_PASSWORD = '123';
 
   // Client IDs
@@ -33,13 +33,13 @@ class AppConfig {
   static const String APP_VERSION = '1.0.0';
 
   // Server Configuration
-  static const String SERVER_URL = 'http://192.168.1.12:4001';
+  static const String SERVER_URL = 'http://192.168.1.92:4001';
 
   // WebSocket Configuration
-  static const String WEBSOCKET_URL = 'ws://192.168.1.12:8887';
+  static const String WEBSOCKET_URL = 'ws://192.168.1.92:8887';
 
   // Socket.IO Configuration
-  static const String SOCKETIO_URL = 'http://192.168.1.12:4001';
+  static const String SOCKETIO_URL = 'http://192.168.1.92:4001';
   static const int SOCKETIO_CONNECT_TIMEOUT =
       20000; // Increased from 10000 to 20000 milliseconds
   static const int SOCKETIO_RECONNECT_DELAY = 5000; // milliseconds

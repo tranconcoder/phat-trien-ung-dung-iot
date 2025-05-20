@@ -42,8 +42,8 @@
 // WiFi credentials
 // const char* ssid = "AI-LAB-A0305";
 // const char* password = "fit*2025";
- char* ssid = "Tran Con";
- char* password = "88888888";
+ char* ssid = "TP-Link M7350";
+ char* password = "password";
 
 // MQTT Configuration
  char* mqtt_server = "fd66ecb3.ala.asia-southeast1.emqxsl.com";

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 
 class ControlPanelScreen extends StatefulWidget {
@@ -44,11 +42,11 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
 
   // MQTT client for turn signals
   MqttServerClient? _mqttClient;
-  bool _isMqttConnected = false;
+  final bool _isMqttConnected = false;
 
   // Turn signal states
-  bool _isLeftSignalOn = false;
-  bool _isRightSignalOn = false;
+  final bool _isLeftSignalOn = false;
+  final bool _isRightSignalOn = false;
 
   @override
   void initState() {
@@ -68,7 +66,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   void _initializeSocketConnection() {
     try {
       // Initialize Socket.IO connection using app config or saved IP
-      final socketIoUrl = 'http://${_websocketIpAddress}:4001';
+      final socketIoUrl = 'http://$_websocketIpAddress:4001';
       debugPrint('Connecting to Socket.IO server: $socketIoUrl');
 
       socket = IO.io(socketIoUrl, <String, dynamic>{
@@ -615,7 +613,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                   final availableHeight = MediaQuery.of(context).size.height;
                   final appBarHeight = AppBar().preferredSize.height;
                   final statusBarHeight = MediaQuery.of(context).padding.top;
-                  final ipDisplayHeight =
+                  const ipDisplayHeight =
                       40.0; // Approximate height of IP display
 
                   // Calculate max safe height for controls

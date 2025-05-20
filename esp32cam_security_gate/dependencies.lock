@@ -115,13 +115,13 @@ dependencies:
   setup_esp32_cam:
     dependencies: []
     source:
-      path: C:\Users\tranv\Workspace\pt_iot\esp32cam_security_gate\main\components\setup_esp32_cam
+      path: /home/tvconss/Workspace/phat-trien-ung-dung-iot/esp32cam_security_gate/main/components/setup_esp32_cam
       type: local
     version: '*'
   setup_esp_websocket_client:
     dependencies: []
     source:
-      path: C:\Users\tranv\Workspace\pt_iot\esp32cam_security_gate\main\components\setup_esp_websocket_client
+      path: /home/tvconss/Workspace/phat-trien-ung-dung-iot/esp32cam_security_gate/main/components/setup_esp_websocket_client
       type: local
     version: '*'
 direct_dependencies:

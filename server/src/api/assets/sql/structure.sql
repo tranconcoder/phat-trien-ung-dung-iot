@@ -1,3 +1,4 @@
+-- Active: 1747159211699@@127.0.0.1@3306@alegrocart-du-lich_dev
 DROP DATABASE IF EXISTS `app_db`;
 
 CREATE DATABASE IF NOT EXISTS `app_db`;
@@ -14,6 +15,9 @@ CREATE TABLE IF NOT EXISTS `users` (
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+INSERT INTO `users` (`email`, `password`, `full_name`, `phone_number`, `address`) VALUES
+('tranvanconkg@gmail.com', '$2a$12$dQkGvLhu7WBvkZ2BiqSlYOxF.buaqz8Sj8jFz3nlzd5gTeB.UMuxS', 'Tran Con', '0909090909', 'Hanoi');
 
 -- Stored in redis
 -- CREATE TABLE IF NOT EXISTS `key_tokens` (
